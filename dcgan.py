@@ -265,7 +265,7 @@ training = tf.placeholder(tf.bool)
 latents = tf.placeholder(tf.float32, shape=(None, args.dimension))
 
 fakes = generator(latents, training=training)
-reals, _ = input_fn(dataset=train_dataset, training=training, num_examples=686,
+reals, _ = input_fn(dataset=train_dataset, training=training, num_examples=202599,
                     num_epochs=args.epochs, batch_size=args.batch)
 
 fake_labels = tf.placeholder(tf.int32, shape=(None))
