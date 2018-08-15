@@ -293,7 +293,7 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     discriminator_train_op = tf.train.AdamOptimizer().minimize(
         loss=discriminator_loss, var_list=discriminator_variables, global_step=discriminator_global_step)
 
-with tf.Session() as session:
+with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
 
     saver = tf.train.Saver()
 
