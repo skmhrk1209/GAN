@@ -302,13 +302,11 @@ with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
     if checkpoint:
 
         saver.restore(session, checkpoint)
-
         print(checkpoint, "loaded")
 
     else:
 
         session.run(tf.global_variables_initializer())
-
         print("global variables initialized")
 
     try:
@@ -327,8 +325,8 @@ with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
 
             if i % 100 == 0:
 
-                checkpoint = saver.save(session, os.path.join(args.model, "model.ckpt"), global_step=generator_global_step)
-
+                checkpoint = saver.save(session, os.path.join(
+                    args.model, "model.ckpt"), global_step=generator_global_step)
                 print(checkpoint, "saved")
 
     except tf.errors.OutOfRangeError:
