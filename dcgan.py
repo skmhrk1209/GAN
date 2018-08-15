@@ -1,3 +1,9 @@
+""" implementation of DCGAN in TensorFlow
+
+[1] [Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks]
+    (https://arxiv.org/pdf/1511.06434.pdf) by Alec Radford, Luke Metz, and Soumith Chintala, Nov 2015.
+"""
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -9,203 +15,258 @@ import cv2
 import os
 import sys
 import argparse
+import functools
+import itertools
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--stp", type=int, default=10000, help="training steps")
-parser.add_argument("--siz", type=int, default=16, help="batch size")
-parser.add_argument("--dim", type=int, default=100, help="latent dimensions")
+parser.add_argument("--model", type=str, default="celeba_dcgan_model", help="model directory")
+parser.add_argument("--dimension", type=int, default=100, help="latent dimensions")
+parser.add_argument("--batch", type=int, default=10, help="batch size")
+parser.add_argument("--epochs", type=int, default=100, help="training epochs")
+parser.add_argument('--train', action="store_true", help="with training")
+parser.add_argument('--eval', action="store_true", help="with evaluation")
+parser.add_argument('--predict', action="store_true", help="with prediction")
 args = parser.parse_args()
+
+tf.logging.set_verbosity(tf.logging.INFO)
+
 
 def generator(inputs, training, reuse=False):
 
-    with tf.variable_scope('generator', reuse=reuse):
+    with tf.variable_scope("generator", reuse=reuse):
 
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        dense layer 1
-        (-1, 100) -> (-1, 8, 8, 1024)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        dense1 = tf.layers.dense(
+        inputs = tf.layers.dense(
             inputs=inputs,
-            units=8 * 8 * 1024,
-            activation=tf.nn.relu
+            units=4 * 4 * 1024
         )
 
-        reshape1 = tf.reshape(
-            tensor=dense1, 
-            shape=(-1, 8, 8, 1024)
+        inputs = tf.reshape(
+            tensor=inputs,
+            shape=(-1, 4, 4, 1024)
         )
 
-        norm1 = tf.layers.batch_normalization(
-            inputs=reshape1,
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
             training=training
         )
 
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        deconvolutional layer 2
-        (-1, 8, 8, 1024) -> (-1, 16, 16, 512)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        deconv2 = tf.layers.conv2d_transpose(
-            inputs=norm1,
+        inputs = tf.nn.relu(inputs)
+
+        inputs = tf.layers.conv2d_transpose(
+            inputs=inputs,
             filters=512,
-            kernel_size=(5, 5),
-            strides=(2, 2),
-            padding="same", 
-            activation=tf.nn.relu
+            kernel_size=5,
+            strides=2,
+            padding="same"
         )
 
-        norm2 = tf.layers.batch_normalization(
-            inputs=deconv2,
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
             training=training
         )
 
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        deconvolutional layer 3
-        (-1, 16, 16, 512) -> (-1, 32, 32, 256)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        deconv3 = tf.layers.conv2d_transpose(
-            inputs=norm2,
+        inputs = tf.nn.relu(inputs)
+
+        inputs = tf.layers.conv2d_transpose(
+            inputs=inputs,
             filters=256,
-            kernel_size=(5, 5),
-            strides=(2, 2), 
-            padding="same", 
-            activation=tf.nn.relu
+            kernel_size=5,
+            strides=2,
+            padding="same"
         )
 
-        norm3 = tf.layers.batch_normalization(
-            inputs=deconv3,
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
             training=training
         )
 
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        deconvolutional layer 4
-        (-1, 32, 32, 256) -> (-1, 64, 64, 128)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        deconv4 = tf.layers.conv2d_transpose(
-            inputs=norm3,
+        inputs = tf.nn.relu(inputs)
+
+        inputs = tf.layers.conv2d_transpose(
+            inputs=inputs,
             filters=128,
-            kernel_size=(5, 5),
-            strides=(2, 2), 
-            padding="same", 
-            activation=tf.nn.relu
+            kernel_size=5,
+            strides=2,
+            padding="same"
         )
 
-        norm4 = tf.layers.batch_normalization(
-            inputs=deconv4,
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
             training=training
         )
 
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        deconvolutional layer 5
-        (-1, 64, 64, 128) -> (-1, 128, 128, 3)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        deconv5 = tf.layers.conv2d_transpose(
-            inputs=norm4, 
-            filters=3, 
-            kernel_size=(5, 5),
-            strides=(2, 2), 
-            padding="same",
-            activation=tf.nn.sigmoid
+        inputs = tf.nn.relu(inputs)
+
+        inputs = tf.layers.conv2d_transpose(
+            inputs=inputs,
+            filters=64,
+            kernel_size=5,
+            strides=2,
+            padding="same"
         )
 
-        return deconv5
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
+            training=training
+        )
+
+        inputs = tf.nn.relu(inputs)
+
+        inputs = tf.layers.conv2d_transpose(
+            inputs=inputs,
+            filters=3,
+            kernel_size=5,
+            strides=2,
+            padding="same"
+        )
+
+        inputs = tf.nn.sigmoid(inputs)
+
+        return inputs
+
 
 def discriminator(inputs, training, reuse=False):
 
-    with tf.variable_scope('discriminator', reuse=reuse):
+    with tf.variable_scope("discriminator", reuse=reuse):
 
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        convolutional layer 1
-        (-1, 128, 128, 3) -> (-1, 64, 64, 32)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        conv1 = tf.layers.conv2d(
+        inputs = tf.layers.conv2d(
             inputs=inputs,
-            filters=32,
-            kernel_size=(5, 5),
-            strides=(2, 2),
-            padding="same",
-            activation=tf.nn.leaky_relu
-        )
-
-        norm1 = tf.layers.batch_normalization(
-            inputs=conv1,
-            training=training
-        )
-
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        convolutional layer 2
-        (-1, 64, 64, 32) -> (-1, 32, 32, 64)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        conv2 = tf.layers.conv2d(
-            inputs=norm1,
             filters=64,
-            kernel_size=(5, 5),
-            strides=(2, 2),
-            padding="same",
-            activation=tf.nn.leaky_relu
+            kernel_size=5,
+            strides=2,
+            padding="same"
         )
 
-        norm2 = tf.layers.batch_normalization(
-            inputs=conv2,
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
             training=training
         )
 
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        convolutional layer 3
-        (-1, 32, 32, 64) -> (-1, 16, 16, 128)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        conv3 = tf.layers.conv2d(
-            inputs=norm2,
+        inputs = tf.nn.leaky_relu(inputs)
+
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
             filters=128,
-            kernel_size=(5, 5),
-            strides=(2, 2),
-            padding="same",
-            activation=tf.nn.leaky_relu
+            kernel_size=5,
+            strides=2,
+            padding="same"
         )
 
-        norm3 = tf.layers.batch_normalization(
-            inputs=conv3,
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
             training=training
         )
 
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        convolutional layer 4
-        (-1, 16, 16, 128) -> (-1, 8, 8, 256)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        conv4 = tf.layers.conv2d(
-            inputs=norm3,
+        inputs = tf.nn.leaky_relu(inputs)
+
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
             filters=256,
-            kernel_size=(5, 5),
-            strides=(2, 2),
-            padding="same",
-            activation=tf.nn.leaky_relu
+            kernel_size=5,
+            strides=2,
+            padding="same"
         )
 
-        norm4 = tf.layers.batch_normalization(
-            inputs=conv4,
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
             training=training
         )
 
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        logits layer 5
-        (-1, 8, 8, 256) -> (-1, 1)
-        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-        reshape5 = tf.reshape(
-            tensor=norm4,
-            shape=(-1, 8 * 8 * 256)
+        inputs = tf.nn.leaky_relu(inputs)
+
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=512,
+            kernel_size=5,
+            strides=2,
+            padding="same"
         )
 
-        logits = tf.layers.dense(
-            inputs=reshape5,
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
+            training=training
+        )
+
+        inputs = tf.nn.leaky_relu(inputs)
+
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=1024,
+            kernel_size=5,
+            strides=2,
+            padding="same"
+        )
+
+        inputs = tf.layers.batch_normalization(
+            inputs=inputs,
+            training=training
+        )
+
+        inputs = tf.nn.leaky_relu(inputs)
+
+        inputs = tf.reduce_mean(
+            input_tensor=inputs,
+            axis=(1, 2)
+        )
+
+        inputs = tf.layers.flatten(inputs)
+
+        inputs = tf.layers.dense(
+            inputs=inputs,
             units=1
         )
 
-        return logits
+        return inputs
+
+
+def input_fn(dataset, training, num_examples, num_epochs, batch_size):
+
+    def parse(example, training):
+
+        features = tf.parse_single_example(
+            serialized=example,
+            features={
+                "path": tf.FixedLenFeature(
+                    shape=(),
+                    dtype=tf.string,
+                    default_value=""
+                ),
+                "label": tf.FixedLenFeature(
+                    shape=(),
+                    dtype=tf.int64,
+                    default_value=0
+                )
+            }
+        )
+
+        path = tf.cast(features["path"], tf.string)
+        label = tf.cast(features["label"], tf.int32)
+
+        image = tf.read_file(path)
+        image = tf.image.decode_jpeg(image, 3)
+        image = tf.image.convert_image_dtype(image, tf.float32)
+        image = tf.image.resize_images(image, (128, 128))
+
+        return image, label
+
+    # how do I get length of dataset ?
+    dataset = dataset.shuffle(num_examples)
+    dataset = dataset.repeat(num_epochs)
+    dataset = dataset.map(functools.partial(parse, training=training))
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(1)
+
+    return dataset.make_one_shot_iterator().get_next()
+
+
+train_dataset = tf.data.TFRecordDataset("train.tfrecord")
 
 training = tf.placeholder(tf.bool)
-latents = tf.placeholder(tf.float32, shape=(None, args.dim))
+latents = tf.placeholder(tf.float32, shape=(None, args.dimension))
 
 fakes = generator(latents, training=training)
-reals = tf.placeholder(tf.float32, shape=(None, 128, 128, 3))
+reals, _ = input_fn(dataset=train_dataset, training=training, num_examples=686,
+                    num_epochs=args.epochs, batch_size=args.batch)
 
 fake_labels = tf.placeholder(tf.int32, shape=(None))
 real_labels = tf.placeholder(tf.int32, shape=(None))
@@ -216,51 +277,60 @@ real_logits = discriminator(reals, training=training, reuse=True)
 concat_logits = tf.concat([fake_logits, real_logits], axis=0)
 
 generator_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=fake_labels, logits=fake_logits)
-discriminator_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=concat_labels, logits=concat_logits)
+discriminator_loss = tf.losses.sigmoid_cross_entropy(
+    multi_class_labels=concat_labels, logits=concat_logits)
 
-generator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
-discriminator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
+generator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator")
+discriminator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator")
+
+generator_global_step = tf.Variable(0, trainable=False)
+discriminator_global_step = tf.Variable(0, trainable=False)
 
 with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
 
-    generator_train_op = tf.train.AdamOptimizer().minimize(loss=generator_loss, var_list=generator_variables)
-    discriminator_train_op = tf.train.AdamOptimizer().minimize(loss=discriminator_loss, var_list=discriminator_variables)
-
-def listfile(directory, extension):
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if os.path.splitext(file)[1] == extension:
-                yield os.path.join(root, file)
-
-def scale(inVal, inMin, inMax, outMin, outMax): 
-    return outMin + (inVal - inMin) / (inMax - inMin) * (outMax - outMin)
-
-images = np.array([scale(cv2.imread(file).astype(np.float32), 0, 255, 0, 1) for file in listfile("./killmebaby_data", ".png")])
+    generator_train_op = tf.train.AdamOptimizer().minimize(
+        loss=generator_loss, var_list=generator_variables, global_step=generator_global_step)
+    discriminator_train_op = tf.train.AdamOptimizer().minimize(
+        loss=discriminator_loss, var_list=discriminator_variables, global_step=discriminator_global_step)
 
 with tf.Session() as session:
 
     saver = tf.train.Saver()
 
-    session.run(tf.global_variables_initializer())
+    checkpoint = tf.train.latest_checkpoint(args.model)
 
-    for i in range(args.stp):
+    if checkpoint:
 
-        noises = np.random.uniform(0.0, 1.0, size=(args.siz, args.dim))
-        batch_images = images[np.random.randint(0, images.shape[0], size=args.siz)]
-        
-        feed_dict = { latents:noises, reals:batch_images, fake_labels:np.ones(args.siz), real_labels:np.ones(args.siz), training:True }
-        session.run(generator_train_op, feed_dict=feed_dict)
+        saver.restore(session, checkpoint)
 
-        feed_dict = { latents:noises, reals:batch_images, fake_labels:np.zeros(args.siz), real_labels:np.ones(args.siz), training:True }
-        session.run(discriminator_train_op, feed_dict=feed_dict)
+        print(checkpoint, "loaded")
 
-        if i % 100 == 0:
+    else:
 
-            saver.save(session, "./killmebaby_dcgan_model/model.ckpt", global_step=i)
+        session.run(tf.global_variables_initializer())
 
-            for j in range(10):
+        print("global variables initialized")
 
-                noises = np.random.uniform(-1.0, 1.0, size=(1, args.dim))
-                images = session.run(fakes, feed_dict={ latents:noises, training:False })
-                    
-                cv2.imwrite(os.path.join(".", "generated_images", "_".join(["image", str(i).zfill(5), str(j).zfill(3)]) + ".png"), images[0])
+    try:
+
+        for i in itertools.count():
+
+            noises = np.random.uniform(0.0, 1.0, size=(args.batch, args.dimension))
+
+            feed_dict = {latents: noises, fake_labels: np.ones(
+                args.batch), real_labels: np.ones(args.batch), training: True}
+            session.run(generator_train_op, feed_dict=feed_dict)
+
+            feed_dict = {latents: noises, fake_labels: np.zeros(
+                args.batch), real_labels: np.ones(args.batch), training: True}
+            session.run(discriminator_train_op, feed_dict=feed_dict)
+
+            if i % 100 == 0:
+
+                checkpoint = saver.save(session, os.path.join(args.model, "model.ckpt"), global_step=generator_global_step)
+
+                print(checkpoint, "saved")
+
+    except tf.errors.OutOfRangeError:
+
+        pass
