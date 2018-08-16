@@ -24,6 +24,7 @@ parser.add_argument("--epochs", type=int, default=100, help="training epochs")
 parser.add_argument('--train', action="store_true", help="with training")
 parser.add_argument('--eval', action="store_true", help="with evaluation")
 parser.add_argument('--predict', action="store_true", help="with prediction")
+parser.add_argument('--gpu', type=str, default="0", help="gpu id")
 args = parser.parse_args()
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -271,13 +272,24 @@ real_logits = discriminator(reals, training=training, reuse=True)
 concat_logits = tf.concat([fake_logits, real_logits], axis=0)
 
 generator_eval_metric_op = tf.metrics.accuracy(
-    labels=fake_labels, predictions=tf.argmax(fake_logits, axis=1))
-discriminator_eval_metric_op = tf.metrics.accuracy(
-    labels=concat_labels, predictions=tf.argmax(concat_logits, axis=1))
+    labels=fake_labels,
+    predictions=tf.argmax(fake_logits, axis=1)
+)
 
-generator_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=fake_labels, logits=fake_logits)
+discriminator_eval_metric_op = tf.metrics.accuracy(
+    labels=concat_labels,
+    predictions=tf.argmax(concat_logits, axis=1)
+)
+
+generator_loss = tf.losses.sigmoid_cross_entropy(
+    multi_class_labels=fake_labels,
+    logits=fake_logits
+)
+
 discriminator_loss = tf.losses.sigmoid_cross_entropy(
-    multi_class_labels=concat_labels, logits=concat_logits)
+    multi_class_labels=concat_labels,
+    logits=concat_logits
+)
 
 generator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator")
 discriminator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator")
@@ -288,11 +300,20 @@ discriminator_global_step = tf.Variable(0, trainable=False)
 with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
 
     generator_train_op = tf.train.AdamOptimizer().minimize(
-        loss=generator_loss, var_list=generator_variables, global_step=generator_global_step)
-    discriminator_train_op = tf.train.AdamOptimizer().minimize(
-        loss=discriminator_loss, var_list=discriminator_variables, global_step=discriminator_global_step)
+        loss=generator_loss,
+        var_list=generator_variables,
+        global_step=generator_global_step
+    )
 
-with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
+    discriminator_train_op = tf.train.AdamOptimizer().minimize(
+        loss=discriminator_loss,
+        var_list=discriminator_variables,
+        global_step=discriminator_global_step
+    )
+
+config = tf.ConfigProto(gpu_options=tf.GPUOptions(visible_device_list=args.gpu))
+
+with tf.Session(config=config) as session:
 
     saver = tf.train.Saver()
 
@@ -301,11 +322,13 @@ with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
     if checkpoint:
 
         saver.restore(session, checkpoint)
+
         print(checkpoint, "loaded")
 
     else:
 
         session.run(tf.global_variables_initializer())
+
         print("global variables initialized")
 
     if args.train:
@@ -314,29 +337,52 @@ with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
 
             print("training started")
 
-            feed_dict = {filenames: ["train.tfrecord"], buffer_size: 180000,
-                         num_epochs: args.epochs, batch_size: args.batch}
-
-            session.run(iterator.initializer, feed_dict=feed_dict)
+            session.run(
+                iterator.initializer,
+                feed_dict={
+                    filenames: ["train.tfrecord"],
+                    buffer_size: 180000,
+                    num_epochs: args.epochs,
+                    batch_size: args.batch
+                }
+            )
 
             for i in itertools.count():
 
-                noises = np.random.uniform(0.0, 1.0, size=(args.batch, args.dimension))
+                noises = np.random.uniform(
+                    low=0.0,
+                    high=1.0,
+                    size=(args.batch, args.dimension)
+                )
 
-                feed_dict = {latents: noises, fake_labels: np.ones(
-                    args.batch), real_labels: np.ones(args.batch), training: True}
+                session.run(
+                    generator_train_op,
+                    feed_dict={
+                        latents: noises,
+                        fake_labels: np.ones(args.batch),
+                        real_labels: np.ones(args.batch),
+                        training: True
+                    }
+                )
 
-                session.run(generator_train_op, feed_dict=feed_dict)
-
-                feed_dict = {latents: noises, fake_labels: np.zeros(
-                    args.batch), real_labels: np.ones(args.batch), training: True}
-
-                session.run(discriminator_train_op, feed_dict=feed_dict)
+                session.run(
+                    discriminator_train_op,
+                    feed_dict={
+                        latents: noises,
+                        fake_labels: np.zeros(args.batch),
+                        real_labels: np.ones(args.batch),
+                        training: True
+                    }
+                )
 
                 if i % 100 == 0:
 
-                    checkpoint = saver.save(session, os.path.join(
-                        args.model, "model.ckpt"), global_step=generator_global_step)
+                    checkpoint = saver.save(
+                        session,
+                        os.path.join(args.model, "model.ckpt"),
+                        global_step=generator_global_step
+                    )
+
                     print(checkpoint, "saved")
 
         except tf.errors.OutOfRangeError:
@@ -349,27 +395,45 @@ with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
 
             print("evaluating started")
 
-            feed_dict = {filenames: ["eval.tfrecord"],
-                         buffer_size: 20000, num_epochs: 1, batch_size: args.batch}
-
-            session.run(iterator.initializer, feed_dict=feed_dict)
+            session.run(
+                iterator.initializer,
+                feed_dict={
+                    filenames: ["eval.tfrecord"],
+                    buffer_size: 20000,
+                    num_epochs: 1,
+                    batch_size: args.batch
+                }
+            )
 
             for i in itertools.count():
 
-                noises = np.random.uniform(0.0, 1.0, size=(args.batch, args.dimension))
+                noises = np.random.uniform(
+                    low=0.0,
+                    high=1.0,
+                    size=(args.batch, args.dimension)
+                )
 
-                feed_dict = {latents: noises, fake_labels: np.ones(
-                    args.batch), real_labels: np.ones(args.batch), training: False}
-
-                generator_accuracy = session.run(generator_eval_metric_op, feed_dict=feed_dict)
+                generator_accuracy = session.run(
+                    generator_eval_metric_op,
+                    feed_dict={
+                        latents: noises,
+                        fake_labels: np.ones(args.batch),
+                        real_labels: np.ones(args.batch),
+                        training: False
+                    }
+                )
 
                 print(generator_accuracy)
 
-                feed_dict = {latents: noises, fake_labels: np.zeros(
-                    args.batch), real_labels: np.ones(args.batch), training: False}
-
                 discriminator_accuracy = session.run(
-                    discriminator_eval_metric_op, feed_dict=feed_dict)
+                    discriminator_eval_metric_op,
+                    feed_dict={
+                        latents: noises,
+                        fake_labels: np.zeros(args.batch),
+                        real_labels: np.ones(args.batch),
+                        training: False
+                    }
+                )
 
                 print(discriminator_accuracy)
 
