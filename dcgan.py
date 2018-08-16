@@ -219,54 +219,50 @@ def discriminator(inputs, training, reuse=False):
         return inputs
 
 
-def input_fn(dataset, training, num_examples, num_epochs, batch_size):
+def parse(example):
 
-    def parse(example, training):
+    features = tf.parse_single_example(
+        serialized=example,
+        features={
+            "path": tf.FixedLenFeature(
+                shape=(),
+                dtype=tf.string,
+                default_value=""
+            ),
+            "label": tf.FixedLenFeature(
+                shape=(),
+                dtype=tf.int64,
+                default_value=0
+            )
+        }
+    )
 
-        features = tf.parse_single_example(
-            serialized=example,
-            features={
-                "path": tf.FixedLenFeature(
-                    shape=(),
-                    dtype=tf.string,
-                    default_value=""
-                ),
-                "label": tf.FixedLenFeature(
-                    shape=(),
-                    dtype=tf.int64,
-                    default_value=0
-                )
-            }
-        )
+    image = tf.read_file(features["path"])
+    image = tf.image.decode_jpeg(image, 3)
+    image = tf.image.convert_image_dtype(image, tf.float32)
+    image = tf.image.resize_images(image, (128, 128))
 
-        path = tf.cast(features["path"], tf.string)
-        label = tf.cast(features["label"], tf.int32)
-
-        image = tf.read_file(path)
-        image = tf.image.decode_jpeg(image, 3)
-        image = tf.image.convert_image_dtype(image, tf.float32)
-        image = tf.image.resize_images(image, (128, 128))
-
-        return image, label
-
-    # how do I get length of dataset ?
-    dataset = dataset.shuffle(num_examples)
-    dataset = dataset.repeat(num_epochs)
-    dataset = dataset.map(functools.partial(parse, training=training))
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(1)
-
-    return dataset.make_one_shot_iterator().get_next()
+    return image
 
 
-train_dataset = tf.data.TFRecordDataset("train.tfrecord")
+filenames = tf.placeholder(tf.string, shape=(None))
+training = tf.placeholder(tf.bool, shape=())
+buffer_size = tf.placeholder(tf.int64, shape=())
+num_epochs = tf.placeholder(tf.int64, shape=())
+batch_size = tf.placeholder(tf.int64, shape=())
 
-training = tf.placeholder(tf.bool)
+dataset = tf.data.TFRecordDataset(filenames)
+dataset = dataset.shuffle(buffer_size)
+dataset = dataset.repeat(num_epochs)
+dataset = dataset.map(parse)
+dataset = dataset.batch(batch_size)
+dataset = dataset.prefetch(1)
+
+iterator = dataset.make_initializable_iterator()
+
 latents = tf.placeholder(tf.float32, shape=(None, args.dimension))
-
 fakes = generator(latents, training=training)
-reals, _ = input_fn(dataset=train_dataset, training=training, num_examples=202599,
-                    num_epochs=args.epochs, batch_size=args.batch)
+reals = iterator.get_next()
 
 fake_labels = tf.placeholder(tf.int32, shape=(None))
 real_labels = tf.placeholder(tf.int32, shape=(None))
@@ -275,6 +271,11 @@ concat_labels = tf.concat([fake_labels, real_labels], axis=0)
 fake_logits = discriminator(fakes, training=training)
 real_logits = discriminator(reals, training=training, reuse=True)
 concat_logits = tf.concat([fake_logits, real_logits], axis=0)
+
+generator_eval_metric_op = tf.metrics.accuracy(
+    labels=fake_labels, predictions=tf.argmax(input=fake_logits, axis=1))
+discriminator_eval_metric_op = tf.metrics.accuracy(
+    labels=concat_labels, predictions=tf.argmax(input=concat_logits, axis=1))
 
 generator_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=fake_labels, logits=fake_logits)
 discriminator_loss = tf.losses.sigmoid_cross_entropy(
@@ -309,26 +310,65 @@ with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
         session.run(tf.global_variables_initializer())
         print("global variables initialized")
 
-    try:
+    if args.train:
 
-        for i in itertools.count():
+        try:
 
-            noises = np.random.uniform(0.0, 1.0, size=(args.batch, args.dimension))
+            feed_dict = {filenames: ["train.tfrecord"], buffer_size: 180000,
+                         num_epochs: args.epochs, batch_size: args.batch}
 
-            feed_dict = {latents: noises, fake_labels: np.ones(
-                args.batch), real_labels: np.ones(args.batch), training: True}
-            session.run(generator_train_op, feed_dict=feed_dict)
+            session.run(iterator.initializer, feed_dict=feed_dict)
 
-            feed_dict = {latents: noises, fake_labels: np.zeros(
-                args.batch), real_labels: np.ones(args.batch), training: True}
-            session.run(discriminator_train_op, feed_dict=feed_dict)
+            for i in itertools.count():
 
-            if i % 100 == 0:
+                noises = np.random.uniform(0.0, 1.0, size=(args.batch, args.dimension))
 
-                checkpoint = saver.save(session, os.path.join(
-                    args.model, "model.ckpt"), global_step=generator_global_step)
-                print(checkpoint, "saved")
+                feed_dict = {latents: noises, fake_labels: np.ones(
+                    args.batch), real_labels: np.ones(args.batch), training: True}
 
-    except tf.errors.OutOfRangeError:
+                session.run(generator_train_op, feed_dict=feed_dict)
 
-        pass
+                feed_dict = {latents: noises, fake_labels: np.zeros(
+                    args.batch), real_labels: np.ones(args.batch), training: True}
+
+                session.run(discriminator_train_op, feed_dict=feed_dict)
+
+                if i % 100 == 0:
+
+                    checkpoint = saver.save(session, os.path.join(
+                        args.model, "model.ckpt"), global_step=generator_global_step)
+                    print(checkpoint, "saved")
+
+        except tf.errors.OutOfRangeError:
+            pass
+
+    if args.eval:
+
+        try:
+
+            feed_dict = {filenames: ["eval.tfrecord"],
+                         buffer_size: 20000, num_epochs: 1, batch_size: args.batch}
+
+            session.run(iterator.initializer, feed_dict=feed_dict)
+
+            for i in itertools.count():
+
+                noises = np.random.uniform(0.0, 1.0, size=(args.batch, args.dimension))
+
+                feed_dict = {latents: noises, fake_labels: np.ones(
+                    args.batch), real_labels: np.ones(args.batch), training: False}
+
+                generator_accuracy = session.run(generator_eval_metric_op, feed_dict=feed_dict)
+
+                print(generator_accuracy)
+
+                feed_dict = {latents: noises, fake_labels: np.zeros(
+                    args.batch), real_labels: np.ones(args.batch), training: False}
+
+                discriminator_accuracy = session.run(
+                    discriminator_eval_metric_op, feed_dict=feed_dict)
+
+                print(discriminator_accuracy)
+
+        except tf.errors.OutOfRangeError:
+            pass
