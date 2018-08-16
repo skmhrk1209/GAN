@@ -1,3 +1,4 @@
 data/
 celeba_dcgan_model/
-train.tfrecord
+train.tfrecord/
+eval.tfrecord/
