@@ -8,19 +8,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-import cv2
 import os
 import sys
 import argparse
 import functools
 import itertools
+import cv2
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="celeba_dcgan_model", help="model directory")
-parser.add_argument("--dimension", type=int, default=100, help="latent dimensions")
 parser.add_argument("--batch", type=int, default=100, help="batch size")
 parser.add_argument("--epochs", type=int, default=100, help="training epochs")
 parser.add_argument('--train', action="store_true", help="with training")
@@ -260,7 +258,7 @@ dataset = dataset.prefetch(1)
 
 iterator = dataset.make_initializable_iterator()
 
-latents = tf.placeholder(tf.float32, shape=(None, args.dimension))
+latents = tf.placeholder(tf.float32, shape=(None, 100))
 fakes = generator(latents, training=training)
 reals = iterator.get_next()
 
@@ -273,9 +271,9 @@ real_logits = discriminator(reals, training=training, reuse=True)
 concat_logits = tf.concat([fake_logits, real_logits], axis=0)
 
 generator_eval_metric_op = tf.metrics.accuracy(
-    labels=fake_labels, predictions=tf.argmax(input=fake_logits, axis=1))
+    labels=fake_labels, predictions=tf.argmax(fake_logits, axis=1))
 discriminator_eval_metric_op = tf.metrics.accuracy(
-    labels=concat_labels, predictions=tf.argmax(input=concat_logits, axis=1))
+    labels=concat_labels, predictions=tf.argmax(concat_logits, axis=1))
 
 generator_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=fake_labels, logits=fake_logits)
 discriminator_loss = tf.losses.sigmoid_cross_entropy(
@@ -314,6 +312,8 @@ with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
 
         try:
 
+            print("training started")
+
             feed_dict = {filenames: ["train.tfrecord"], buffer_size: 180000,
                          num_epochs: args.epochs, batch_size: args.batch}
 
@@ -340,11 +340,14 @@ with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
                     print(checkpoint, "saved")
 
         except tf.errors.OutOfRangeError:
-            pass
+
+            print("training ended")
 
     if args.eval:
 
         try:
+
+            print("evaluating started")
 
             feed_dict = {filenames: ["eval.tfrecord"],
                          buffer_size: 20000, num_epochs: 1, batch_size: args.batch}
@@ -371,4 +374,5 @@ with tf.Session(config=tf.ConfigProto(device_count={"GPU": 1})) as session:
                 print(discriminator_accuracy)
 
         except tf.errors.OutOfRangeError:
-            pass
+
+            print("evaluating ended")
