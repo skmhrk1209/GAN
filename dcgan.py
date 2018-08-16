@@ -316,7 +316,7 @@ config = tf.ConfigProto(
         visible_device_list=args.gpu
     ),
     device_count={
-        "GPU":1
+        "GPU": 1
     }
 )
 
