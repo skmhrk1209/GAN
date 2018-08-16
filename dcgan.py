@@ -311,7 +311,14 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
         global_step=discriminator_global_step
     )
 
-config = tf.ConfigProto(gpu_options=tf.GPUOptions(visible_device_list=args.gpu))
+config = tf.ConfigProto(
+    gpu_options=tf.GPUOptions(
+        visible_device_list=args.gpu
+    ),
+    device_count={
+        "GPU":1
+    }
+)
 
 with tf.Session(config=config) as session:
 
