@@ -352,7 +352,7 @@ with tf.Session(config=config) as session:
                 noises = np.random.uniform(
                     low=0.0,
                     high=1.0,
-                    size=(args.batch, args.dimension)
+                    size=(args.batch, 100)
                 )
 
                 session.run(
@@ -410,7 +410,7 @@ with tf.Session(config=config) as session:
                 noises = np.random.uniform(
                     low=0.0,
                     high=1.0,
-                    size=(args.batch, args.dimension)
+                    size=(args.batch, 100)
                 )
 
                 generator_accuracy = session.run(
