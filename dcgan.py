@@ -338,6 +338,10 @@ with tf.Session(config=config) as session:
 
         print("global variables initialized")
 
+        session.run(tf.local_variables_initializer())
+
+        print("local variables initialized")
+
     if args.train:
 
         try:
