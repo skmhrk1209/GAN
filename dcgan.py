@@ -330,6 +330,8 @@ with tf.Session(config=config) as session:
 
         saver.restore(session, checkpoint)
 
+        session.run(tf.local_variables_initializer())
+
         print(checkpoint, "loaded")
 
     else:
