@@ -326,11 +326,13 @@ with tf.Session(config=config) as session:
 
     checkpoint = tf.train.latest_checkpoint(args.model)
 
+    session.run(tf.local_variables_initializer())
+
+    print("local variables initialized")
+
     if checkpoint:
 
         saver.restore(session, checkpoint)
-
-        session.run(tf.local_variables_initializer())
 
         print(checkpoint, "loaded")
 
@@ -339,10 +341,6 @@ with tf.Session(config=config) as session:
         session.run(tf.global_variables_initializer())
 
         print("global variables initialized")
-
-        session.run(tf.local_variables_initializer())
-
-        print("local variables initialized")
 
     if args.train:
 
