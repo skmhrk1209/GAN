@@ -273,12 +273,20 @@ concat_logits = tf.concat([fake_logits, real_logits], axis=0)
 
 generator_eval_metric_op = tf.metrics.accuracy(
     labels=fake_labels,
-    predictions=tf.argmax(fake_logits, axis=1)
+    predictions=tf.map_fn(
+        fn=lambda x: x > 0.5,
+        elems=fake_logits,
+        dtype=tf.int32
+    )
 )
 
 discriminator_eval_metric_op = tf.metrics.accuracy(
     labels=concat_labels,
-    predictions=tf.argmax(concat_logits, axis=1)
+    predictions=tf.map_fn(
+        fn=lambda x: x > 0.5,
+        elems=concat_logits,
+        dtype=tf.int32
+    )
 )
 
 generator_loss = tf.losses.sigmoid_cross_entropy(
