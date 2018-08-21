@@ -271,6 +271,8 @@ fake_logits = discriminator(fakes, training=training)
 real_logits = discriminator(reals, training=training, reuse=True)
 concat_logits = tf.concat([fake_logits, real_logits], axis=0)
 
+print(concat_logits.get_shape())
+
 generator_eval_metric_op = tf.metrics.accuracy(
     labels=fake_labels,
     predictions=tf.map_fn(
