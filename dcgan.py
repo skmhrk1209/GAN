@@ -271,16 +271,10 @@ fake_logits = discriminator(fakes, training=training)
 real_logits = discriminator(reals, training=training, reuse=True)
 concat_logits = tf.concat([fake_logits, real_logits], axis=0)
 
-print(fake_labels.get_shape())
-print(tf.map_fn(
-        fn=lambda x: tf.cond(x > 0.5, lambda: 1, lambda: 0),
-        elems=fake_logits
-    ).get_shape())
-
 generator_eval_metric_op = tf.metrics.accuracy(
     labels=fake_labels,
     predictions=tf.map_fn(
-        fn=lambda x: tf.cond(x > 0.5, lambda: 1, lambda: 0),
+        fn=lambda x: tf.cond(tf.reduce_max(x) > 0.5, lambda: 1, lambda: 0),
         elems=fake_logits
     )
 )
@@ -288,7 +282,7 @@ generator_eval_metric_op = tf.metrics.accuracy(
 discriminator_eval_metric_op = tf.metrics.accuracy(
     labels=concat_labels,
     predictions=tf.map_fn(
-        fn=lambda x: tf.cond(x > 0.5, lambda: 1, lambda: 0),
+        fn=lambda x: tf.cond(tf.reduce_max(x) > 0.5, lambda: 1, lambda: 0),
         elems=concat_logits
     )
 )
