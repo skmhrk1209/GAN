@@ -212,7 +212,7 @@ def discriminator(inputs, training, reuse=False):
 
         inputs = tf.layers.dense(
             inputs=inputs,
-            units=1
+            units=2
         )
 
         return inputs
@@ -273,27 +273,21 @@ concat_logits = tf.concat([fake_logits, real_logits], axis=0)
 
 generator_eval_metric_op = tf.metrics.accuracy(
     labels=fake_labels,
-    predictions=tf.map_fn(
-        fn=lambda x: tf.cond(tf.reduce_max(x) > 0.5, lambda: 1, lambda: 0),
-        elems=fake_logits
-    )
+    predictions=tf.argmax(fake_logits, axis=1)
 )
 
 discriminator_eval_metric_op = tf.metrics.accuracy(
     labels=concat_labels,
-    predictions=tf.map_fn(
-        fn=lambda x: tf.cond(tf.reduce_max(x) > 0.5, lambda: 1, lambda: 0),
-        elems=concat_logits
-    )
+    predictions=tf.argmax(concat_logits, axis=1)
 )
 
-generator_loss = tf.losses.sigmoid_cross_entropy(
-    multi_class_labels=fake_labels,
+generator_loss = tf.losses.sparse_softmax_cross_entropy(
+    labels=fake_labels,
     logits=fake_logits
 )
 
-discriminator_loss = tf.losses.sigmoid_cross_entropy(
-    multi_class_labels=concat_labels,
+discriminator_loss = tf.losses.sparse_softmax_cross_entropy(
+    labels=concat_labels,
     logits=concat_logits
 )
 
