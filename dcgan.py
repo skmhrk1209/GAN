@@ -360,11 +360,7 @@ with tf.Session(config=config) as session:
 
             for i in itertools.count():
 
-                noises = np.random.uniform(
-                    low=0.0,
-                    high=1.0,
-                    size=(args.batch, 100)
-                )
+                noises = np.random.uniform(0.0, 1.0, (args.batch, 100))
 
                 session.run(
                     generator_train_op,
@@ -418,11 +414,7 @@ with tf.Session(config=config) as session:
 
             for i in itertools.count():
 
-                noises = np.random.uniform(
-                    low=0.0,
-                    high=1.0,
-                    size=(args.batch, 100)
-                )
+                noises = np.random.uniform(0.0, 1.0, (args.batch, 100))
 
                 generator_accuracy = session.run(
                     generator_eval_metric_op,
@@ -451,3 +443,17 @@ with tf.Session(config=config) as session:
         except tf.errors.OutOfRangeError:
 
             print("evaluating ended")
+
+    if args.predict:
+
+        for i in itertools.count():
+
+            noises = np.random.uniform(0.0, 1.0, (1, 100))
+
+            fake_images = session.run(fakes, feed_dict={latents: noises})
+
+            cv2.imshow("image", fake_images[0])
+
+            if cv2.waitKey(1000) == ord("q"):
+
+                break
