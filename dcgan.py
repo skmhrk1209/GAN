@@ -434,7 +434,7 @@ with tf.Session(config=config) as session:
                     }
                 )
 
-                print(generator_accuracy)
+                print("generator_accuracy", generator_accuracy)
 
                 discriminator_accuracy = session.run(
                     discriminator_eval_metric_op,
@@ -446,7 +446,7 @@ with tf.Session(config=config) as session:
                     }
                 )
 
-                print(discriminator_accuracy)
+                print("discriminator_accuracy", discriminator_accuracy)
 
         except tf.errors.OutOfRangeError:
 
