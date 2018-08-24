@@ -254,7 +254,7 @@ dataset = tf.data.TFRecordDataset(filenames)
 dataset = dataset.shuffle(buffer_size)
 dataset = dataset.repeat(num_epochs)
 dataset = dataset.map(parse)
-dataset = dataset.batch(batch_size, drop_remainder=True)
+dataset = dataset.batch(batch_size)
 dataset = dataset.prefetch(1)
 
 iterator = dataset.make_initializable_iterator()
