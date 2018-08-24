@@ -450,9 +450,15 @@ with tf.Session(config=config) as session:
 
             noises = np.random.uniform(0.0, 1.0, (1, 100))
 
-            fake_images = session.run(fakes, feed_dict={latents: noises})
+            images = session.run(
+                fakes,
+                feed_dict={
+                    latents: noises,
+                    training: False
+                }
+            )
 
-            cv2.imshow("image", fake_images[0])
+            cv2.imshow("image", cv2.cvtColor(images[0], cv2.COLOR_BGR2RGB))
 
             if cv2.waitKey(1000) == ord("q"):
 
