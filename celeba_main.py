@@ -102,7 +102,7 @@ discriminator = dcgan.Model.Discriminator(
     channels_first=True
 )
 
-latents = tf.placeholder(tf.float32, shape=[None, 100])
+latents = tf.placeholder(tf.float32, shape=[None, 256])
 fakes = generator(latents, training=training)
 reals = iterator.get_next()
 
