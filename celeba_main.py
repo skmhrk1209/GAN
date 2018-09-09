@@ -217,14 +217,14 @@ with tf.Session(config=config) as session:
 
             for i in itertools.count():
 
-                noises = np.random.uniform(0.0, 1.0, [args.batch, 100])
+                noises = np.random.normal(loc=0.0, scale=1.0, size=[args.batch, 256])
 
                 session.run(
                     generator_train_op,
                     feed_dict={
                         latents: noises,
-                        fake_labels: np.ones(args.batch),
-                        real_labels: np.ones(args.batch),
+                        fake_labels: np.ones([args.batch, 1]),
+                        real_labels: np.ones([args.batch, 1]),
                         training: True
                     }
                 )
@@ -233,8 +233,8 @@ with tf.Session(config=config) as session:
                     discriminator_train_op,
                     feed_dict={
                         latents: noises,
-                        fake_labels: np.zeros(args.batch),
-                        real_labels: np.ones(args.batch),
+                        fake_labels: np.zeros([args.batch, 1]),
+                        real_labels: np.ones([args.batch, 1]),
                         training: True
                     }
                 )
@@ -271,14 +271,14 @@ with tf.Session(config=config) as session:
 
             for i in itertools.count():
 
-                noises = np.random.uniform(0.0, 1.0, [args.batch, 100])
+                noises = np.random.normal(loc=0.0, scale=1.0, size=[args.batch, 256])
 
                 generator_accuracy = session.run(
                     generator_eval_metric_op,
                     feed_dict={
                         latents: noises,
-                        fake_labels: np.ones(args.batch),
-                        real_labels: np.ones(args.batch),
+                        fake_labels: np.ones([args.batch, 1]),
+                        real_labels: np.ones([args.batch, 1]),
                         training: False
                     }
                 )
@@ -289,8 +289,8 @@ with tf.Session(config=config) as session:
                     discriminator_eval_metric_op,
                     feed_dict={
                         latents: noises,
-                        fake_labels: np.zeros(args.batch),
-                        real_labels: np.ones(args.batch),
+                        fake_labels: np.zeros([args.batch, 1]),
+                        real_labels: np.ones([args.batch, 1]),
                         training: False
                     }
                 )
@@ -305,7 +305,7 @@ with tf.Session(config=config) as session:
 
         for i in itertools.count():
 
-            noises = np.random.uniform(0.0, 1.0, [1, 100])
+            noises = np.random.normal(loc=0.0, scale=1.0, size=[1, 256])
 
             images = session.run(
                 fakes,
