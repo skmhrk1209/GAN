@@ -157,7 +157,7 @@ concat_logits = tf.concat([fake_logits, real_logits], axis=0)
 generator_eval_metric_op = tf.metrics.accuracy(
     labels=fake_labels,
     predictions=tf.map_fn(
-        fn=tf.round,
+        fn=lambda logit: tf.cast(tf.round(logit), tf.int32),
         elems=fake_logits
     )
 )
@@ -165,7 +165,7 @@ generator_eval_metric_op = tf.metrics.accuracy(
 discriminator_eval_metric_op = tf.metrics.accuracy(
     labels=concat_labels,
     predictions=tf.map_fn(
-        fn=tf.round,
+        fn=lambda logit: tf.cast(tf.round(logit), tf.int32),
         elems=concat_logits
     )
 )
