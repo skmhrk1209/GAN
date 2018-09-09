@@ -52,8 +52,6 @@ class Model(resnet.Model):
                     )
                 )
 
-                print(inputs.get_shape())
-
                 inputs = util.chunk_images(
                     inputs=inputs,
                     size=[
