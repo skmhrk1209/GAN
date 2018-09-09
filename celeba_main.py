@@ -14,7 +14,7 @@ import dcgan
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="celeba_dcgan_model", help="model directory")
-parser.add_argument("--batch", type=int, default=100, help="batch size")
+parser.add_argument("--batch", type=int, default=50, help="batch size")
 parser.add_argument("--epochs", type=int, default=100, help="training epochs")
 parser.add_argument('--train', action="store_true", help="with training")
 parser.add_argument('--eval', action="store_true", help="with evaluation")
