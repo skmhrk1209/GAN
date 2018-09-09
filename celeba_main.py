@@ -46,7 +46,7 @@ def parse_fn(example, channels_first):
     image = tf.read_file(features["path"])
     image = tf.image.decode_jpeg(image, 3)
     image = tf.image.convert_image_dtype(image, tf.float32)
-    image = tf.image.resize_images(image, [128, 128])
+    image = tf.image.resize_images(image, [256, 256])
     image = tf.transpose(image, [2, 0, 1] if channels_first else [0, 1, 2])
 
     return image
@@ -68,37 +68,37 @@ dataset = dataset.prefetch(1)
 iterator = dataset.make_initializable_iterator()
 
 generator = dcgan.Model.Generator(
-    image_size=[128, 128],
+    image_size=[256, 256],
     filters=1024,
     bottleneck=False,
     version=2,
     block_params=[
-        dcgan.Model.Generator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Generator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Generator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Generator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Generator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Generator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         )
     ],
-    final_conv_param=dcgan.Model.Generator.ConvParam(
+    final_conv_param=dcgan.Model.ConvParam(
         kernel_size=3,
         strides=1
     ),
@@ -107,36 +107,36 @@ generator = dcgan.Model.Generator(
 
 discriminator = dcgan.Model.Discriminator(
     filters=32,
-    initial_conv_param=dcgan.Model.Discriminator.ConvParam(
+    initial_conv_param=dcgan.Model.ConvParam(
         kernel_size=3,
         strides=1
     ),
     bottleneck=False,
     version=2,
     block_params=[
-        dcgan.Model.Discriminator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Discriminator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Discriminator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Discriminator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Discriminator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         ),
-        dcgan.Model.Discriminator.BlockParam(
+        dcgan.Model.BlockParam(
             blocks=1,
-            strides=2
+            strides=1
         )
     ],
     channels_first=True

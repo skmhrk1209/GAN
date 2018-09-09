@@ -10,7 +10,7 @@ import resnet
 import util
 
 
-class Model(object):
+class Model(resnet.Model):
 
     """ implementation of DCGAN in TensorFlow
 
@@ -18,7 +18,7 @@ class Model(object):
         (https://arxiv.org/pdf/1511.06434.pdf) by Alec Radford, Luke Metz, and Soumith Chintala, Nov 2015.
     """
 
-    class Generator(resnet.Model):
+    class Generator(object):
 
         def __init__(self, image_size, filters, bottleneck, version, block_params, final_conv_param, channels_first):
 
@@ -33,10 +33,10 @@ class Model(object):
 
         def __call__(self, inputs, training, reuse=False):
 
-            block_fn = ((Model.Generator.bottleneck_block_v1 if self.version == 1 else Model.Generator.bottleneck_block_v2) if self.bottleneck else
-                        (Model.Generator.building_block_v1 if self.version == 1 else Model.Generator.building_block_v2))
+            block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
+                        (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
 
-            projection_shortcut = Model.Generator.projection_shortcut
+            projection_shortcut = Model.projection_shortcut
 
             with tf.variable_scope("generator", reuse=reuse):
 
@@ -46,21 +46,29 @@ class Model(object):
 
                 inputs = tf.layers.dense(
                     inputs=inputs,
-                    units=(self.filters *
-                           self.image_size[0] // strides_product *
-                           self.image_size[1] // strides_product)
+                    units=(
+                        self.filters *
+                        self.image_size[0] // strides_product *
+                        self.image_size[1] // strides_product
+                    )
                 )
 
                 inputs = util.chunk_images(
                     inputs=inputs,
-                    image_size=[self.image_size[0] // strides_product,
-                                self.image_size[1] // strides_product],
+                    image_size=[
+                        self.image_size[0] // strides_product,
+                        self.image_size[1] // strides_product
+                    ],
                     data_format=self.data_format
                 )
 
+                if self.version == 1:
+
+                    inputs = tf.nn.leaky_relu(inputs)
+
                 for i, block_param in enumerate(self.block_params):
 
-                    inputs = Model.Generator.block_layer(
+                    inputs = Model.block_layer(
                         inputs=inputs,
                         block_fn=block_fn,
                         blocks=block_param.blocks,
@@ -71,17 +79,13 @@ class Model(object):
                         training=training
                     )
 
-                if self.version == 2:
+                    inputs = util.up_sampling2d(2, self.data_format)(inputs)
 
-                    inputs = util.batch_normalization(self.data_format)(
-                        inputs=inputs,
-                        training=training,
-                        fused=True
-                    )
+                if self.version == 2:
 
                     inputs = tf.nn.leaky_relu(inputs)
 
-                inputs = tf.layers.conv2d_transpose(
+                inputs = tf.layers.conv2d(
                     inputs=inputs,
                     filters=3,
                     kernel_size=self.final_conv_param.kernel_size,
@@ -95,295 +99,7 @@ class Model(object):
 
                 return inputs
 
-        @staticmethod
-        def building_block_v1(inputs, filters, strides, projection_shortcut, data_format, training):
-
-            shortcut = inputs
-
-            if projection_shortcut:
-
-                shortcut = projection_shortcut(
-                    inputs=inputs,
-                    filters=filters,
-                    strides=strides,
-                    data_format=data_format
-                )
-
-                shortcut = util.batch_normalization(data_format)(
-                    inputs=shortcut,
-                    training=training,
-                    fused=True
-                )
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
-                strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs += shortcut
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            return inputs
-
-        @staticmethod
-        def building_block_v2(inputs, filters, strides, projection_shortcut, data_format, training):
-
-            shortcut = inputs
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            if projection_shortcut:
-
-                shortcut = projection_shortcut(
-                    inputs=inputs,
-                    filters=filters,
-                    strides=strides,
-                    data_format=data_format
-                )
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
-                strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs += shortcut
-
-            return inputs
-
-        @staticmethod
-        def bottleneck_block_v1(inputs, filters, strides, projection_shortcut, data_format, training):
-
-            shortcut = inputs
-
-            if projection_shortcut:
-
-                shortcut = projection_shortcut(
-                    inputs=inputs,
-                    filters=filters >> 2,
-                    strides=strides,
-                    data_format=data_format
-                )
-
-                shortcut = util.batch_normalization(data_format)(
-                    inputs=shortcut,
-                    training=training,
-                    fused=True
-                )
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=1,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
-                strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters >> 2,
-                kernel_size=1,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs += shortcut
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            return inputs
-
-        @staticmethod
-        def bottleneck_block_v2(inputs, filters, strides, projection_shortcut, data_format, training):
-
-            shortcut = inputs
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            if projection_shortcut:
-
-                shortcut = projection_shortcut(
-                    inputs=inputs,
-                    filters=filters >> 2,
-                    strides=strides,
-                    data_format=data_format
-                )
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=1,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
-                strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            inputs = tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters >> 2,
-                kernel_size=1,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs += shortcut
-
-            return inputs
-
-        @staticmethod
-        def projection_shortcut(inputs, filters, strides, data_format):
-
-            return tf.layers.conv2d_transpose(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=1,
-                strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-    class Discriminator(resnet.Model):
+    class Discriminator(object):
 
         def __init__(self, filters, initial_conv_param, bottleneck, version, block_params, channels_first):
 
@@ -397,10 +113,10 @@ class Model(object):
 
         def __call__(self, inputs, training, reuse=False):
 
-            block_fn = ((Model.Discriminator.bottleneck_block_v1 if self.version == 1 else Model.Discriminator.bottleneck_block_v2) if self.bottleneck else
-                        (Model.Discriminator.building_block_v1 if self.version == 1 else Model.Discriminator.building_block_v2))
+            block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
+                        (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
 
-            projection_shortcut = Model.Discriminator.projection_shortcut
+            projection_shortcut = Model.projection_shortcut
 
             with tf.variable_scope("discriminator", reuse=reuse):
 
@@ -417,17 +133,11 @@ class Model(object):
 
                 if self.version == 1:
 
-                    inputs = util.batch_normalization(self.data_format)(
-                        inputs=inputs,
-                        training=training,
-                        fused=True
-                    )
-
                     inputs = tf.nn.leaky_relu(inputs)
 
                 for i, block_param in enumerate(self.block_params):
 
-                    inputs = Model.Discriminator.block_layer(
+                    inputs = Model.block_layer(
                         inputs=inputs,
                         block_fn=block_fn,
                         blocks=block_param.blocks,
@@ -438,13 +148,15 @@ class Model(object):
                         training=training
                     )
 
-                if self.version == 2:
-
-                    inputs = util.batch_normalization(self.data_format)(
+                    inputs = tf.layers.average_pooling2d(
                         inputs=inputs,
-                        training=training,
-                        fused=True
+                        pool_size=2,
+                        strides=2,
+                        padding="same",
+                        data_format=self.data_format
                     )
+
+                if self.version == 2:
 
                     inputs = tf.nn.leaky_relu(inputs)
 
@@ -457,290 +169,204 @@ class Model(object):
 
                 return inputs
 
-        @staticmethod
-        def building_block_v1(inputs, filters, strides, projection_shortcut, data_format, training):
+    @staticmethod
+    def building_block_v1(inputs, filters, strides, projection_shortcut, data_format, training):
 
-            shortcut = inputs
+        shortcut = inputs
 
-            if projection_shortcut:
+        if projection_shortcut:
 
-                shortcut = projection_shortcut(
-                    inputs=inputs,
-                    filters=filters,
-                    strides=strides,
-                    data_format=data_format
-                )
-
-                shortcut = util.batch_normalization(data_format)(
-                    inputs=shortcut,
-                    training=training,
-                    fused=True
-                )
-
-            inputs = tf.layers.conv2d(
+            shortcut = projection_shortcut(
                 inputs=inputs,
                 filters=filters,
-                kernel_size=3,
                 strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
+                data_format=data_format
             )
 
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters,
+            kernel_size=3,
+            strides=strides,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
 
-            inputs = tf.nn.leaky_relu(inputs)
+        inputs = tf.nn.leaky_relu(inputs)
 
-            inputs = tf.layers.conv2d(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters,
+            kernel_size=3,
+            strides=1,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
 
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
+        inputs += shortcut
 
-            inputs += shortcut
+        inputs = tf.nn.leaky_relu(inputs)
 
-            inputs = tf.nn.leaky_relu(inputs)
+        return inputs
 
-            return inputs
+    @staticmethod
+    def building_block_v2(inputs, filters, strides, projection_shortcut, data_format, training):
 
-        @staticmethod
-        def building_block_v2(inputs, filters, strides, projection_shortcut, data_format, training):
+        shortcut = inputs
 
-            shortcut = inputs
+        inputs = tf.nn.leaky_relu(inputs)
 
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
+        if projection_shortcut:
 
-            inputs = tf.nn.leaky_relu(inputs)
-
-            if projection_shortcut:
-
-                shortcut = projection_shortcut(
-                    inputs=inputs,
-                    filters=filters,
-                    strides=strides,
-                    data_format=data_format
-                )
-
-            inputs = tf.layers.conv2d(
+            shortcut = projection_shortcut(
                 inputs=inputs,
                 filters=filters,
-                kernel_size=3,
                 strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
+                data_format=data_format
             )
 
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters,
+            kernel_size=3,
+            strides=strides,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
 
-            inputs = tf.nn.leaky_relu(inputs)
+        inputs = tf.nn.leaky_relu(inputs)
 
-            inputs = tf.layers.conv2d(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters,
+            kernel_size=3,
+            strides=1,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
 
-            inputs += shortcut
+        inputs += shortcut
 
-            return inputs
+        return inputs
 
-        @staticmethod
-        def bottleneck_block_v1(inputs, filters, strides, projection_shortcut, data_format, training):
+    @staticmethod
+    def bottleneck_block_v1(inputs, filters, strides, projection_shortcut, data_format, training):
 
-            shortcut = inputs
+        shortcut = inputs
 
-            if projection_shortcut:
+        if projection_shortcut:
 
-                shortcut = projection_shortcut(
-                    inputs=inputs,
-                    filters=filters << 2,
-                    strides=strides,
-                    data_format=data_format
-                )
-
-                shortcut = util.batch_normalization(data_format)(
-                    inputs=shortcut,
-                    training=training,
-                    fused=True
-                )
-
-            inputs = tf.layers.conv2d(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=1,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            inputs = tf.layers.conv2d(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
-                strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            inputs = tf.layers.conv2d(
+            shortcut = projection_shortcut(
                 inputs=inputs,
                 filters=filters << 2,
-                kernel_size=1,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs += shortcut
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            return inputs
-
-        @staticmethod
-        def bottleneck_block_v2(inputs, filters, strides, projection_shortcut, data_format, training):
-
-            shortcut = inputs
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            if projection_shortcut:
-
-                shortcut = projection_shortcut(
-                    inputs=inputs,
-                    filters=filters << 2,
-                    strides=strides,
-                    data_format=data_format
-                )
-
-            inputs = tf.layers.conv2d(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=1,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
-
-            inputs = tf.nn.leaky_relu(inputs)
-
-            inputs = tf.layers.conv2d(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=3,
                 strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
+                data_format=data_format
             )
 
-            inputs = util.batch_normalization(data_format)(
-                inputs=inputs,
-                training=training,
-                fused=True
-            )
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters,
+            kernel_size=1,
+            strides=1,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
 
-            inputs = tf.nn.leaky_relu(inputs)
+        inputs = tf.nn.leaky_relu(inputs)
 
-            inputs = tf.layers.conv2d(
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters,
+            kernel_size=3,
+            strides=strides,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
+
+        inputs = tf.nn.leaky_relu(inputs)
+
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters << 2,
+            kernel_size=1,
+            strides=1,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
+
+        inputs += shortcut
+
+        inputs = tf.nn.leaky_relu(inputs)
+
+        return inputs
+
+    @staticmethod
+    def bottleneck_block_v2(inputs, filters, strides, projection_shortcut, data_format, training):
+
+        shortcut = inputs
+
+        inputs = tf.nn.leaky_relu(inputs)
+
+        if projection_shortcut:
+
+            shortcut = projection_shortcut(
                 inputs=inputs,
                 filters=filters << 2,
-                kernel_size=1,
-                strides=1,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
-            )
-
-            inputs += shortcut
-
-            return inputs
-
-        @staticmethod
-        def projection_shortcut(inputs, filters, strides, data_format):
-
-            return tf.layers.conv2d(
-                inputs=inputs,
-                filters=filters,
-                kernel_size=1,
                 strides=strides,
-                padding="same",
-                data_format=data_format,
-                use_bias=False,
-                kernel_initializer=tf.variance_scaling_initializer(),
+                data_format=data_format
             )
+
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters,
+            kernel_size=1,
+            strides=1,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
+
+        inputs = tf.nn.leaky_relu(inputs)
+
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters,
+            kernel_size=3,
+            strides=strides,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
+
+        inputs = tf.nn.leaky_relu(inputs)
+
+        inputs = tf.layers.conv2d(
+            inputs=inputs,
+            filters=filters << 2,
+            kernel_size=1,
+            strides=1,
+            padding="same",
+            data_format=data_format,
+            use_bias=False,
+            kernel_initializer=tf.variance_scaling_initializer(),
+        )
+
+        inputs += shortcut
+
+        return inputs
