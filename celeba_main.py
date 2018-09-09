@@ -46,7 +46,7 @@ def parse_fn(example, channels_first):
     image = tf.read_file(features["path"])
     image = tf.image.decode_jpeg(image, 3)
     image = tf.image.convert_image_dtype(image, tf.float32)
-    image = tf.image.resize_images(image, [256, 256])
+    image = tf.image.resize_images(image, [128, 128])
     image = tf.transpose(image, [2, 0, 1] if channels_first else [0, 1, 2])
 
     return image
@@ -68,7 +68,7 @@ dataset = dataset.prefetch(1)
 iterator = dataset.make_initializable_iterator()
 
 generator = dcgan.Model.Generator(
-    image_size=[256, 256],
+    image_size=[128, 128],
     filters=1024,
     bottleneck=False,
     version=2,
@@ -180,9 +180,10 @@ discriminator_loss = tf.losses.sigmoid_cross_entropy(
     logits=concat_logits
 )
 
-real = reals[:1]
-gradients = tf.gradients(ys=discriminator(real, training=training, reuse=True), xs=real)
-discriminator_loss += tf.nn.l2_loss(gradients) * 10.0
+gradient = tf.gradients(ys=real_logits, xs=[reals])
+gradient_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(gradient), axis=[1, 2, 3])) * 10.0
+
+discriminator_loss += gradient_penalty
 
 generator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator")
 discriminator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator")
@@ -205,9 +206,12 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     )
 
 config = tf.ConfigProto(
+    '''
     gpu_options=tf.GPUOptions(
         visible_device_list=args.gpu
-    )
+    ),
+    '''
+    device_count={"GPU": 1}
 )
 
 with tf.Session(config=config) as session:
