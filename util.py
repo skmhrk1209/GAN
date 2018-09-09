@@ -41,14 +41,14 @@ def flatten_images(inputs, data_format):
     )
 
 
-def chunk_images(inputs, image_size, data_format):
+def chunk_images(inputs, size, data_format):
 
     shape = inputs.get_shape().as_list()
 
     return tf.reshape(
         tensor=inputs,
-        shape=([-1, shape[1] // (image_size[0] * image_size[1]), image_size[0], image_size[1]] if data_format == "channels_first" else
-               [-1, image_size[0], image_size[1], shape[1] // (image_size[0] * image_size[1])])
+        shape=([-1, shape[1] // (size[0] * size[1]), size[0], size[1]] if data_format == "channels_first" else
+               [-1, size[0], size[1], shape[1] // (size[0] * size[1])])
     )
 
 

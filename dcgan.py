@@ -47,16 +47,18 @@ class Model(resnet.Model):
                     inputs=inputs,
                     units=(
                         self.filters *
-                        self.image_size[0] >> len(self.block_params) *
-                        self.image_size[1] >> len(self.block_params)
+                        (self.image_size[0] >> len(self.block_params)) *
+                        (self.image_size[1] >> len(self.block_params))
                     )
                 )
 
+                print(inputs.get_shape())
+
                 inputs = util.chunk_images(
                     inputs=inputs,
-                    image_size=[
-                        self.image_size[0] >> len(self.block_params),
-                        self.image_size[1] >> len(self.block_params)
+                    size=[
+                        (self.image_size[0] >> len(self.block_params)),
+                        (self.image_size[1] >> len(self.block_params))
                     ],
                     data_format=self.data_format
                 )
