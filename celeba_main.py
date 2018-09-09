@@ -53,7 +53,6 @@ def preprocess(path, channels_first):
 
     image = tf.read_file(path)
     image = tf.image.decode_jpeg(image, 3)
-    image = tf.image.convert_image_dtype(image, tf.float32)
     image = tf.image.resize_images(image, [256, 256])
     image = tf.transpose(image, [2, 0, 1] if channels_first else [0, 1, 2])
 
