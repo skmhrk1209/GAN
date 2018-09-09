@@ -76,28 +76,8 @@ generator = dcgan.Model.Generator(
         dcgan.Model.BlockParam(
             blocks=1,
             strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
         )
-    ],
+    ] * 6,
     final_conv_param=dcgan.Model.ConvParam(
         kernel_size=3,
         strides=1
@@ -117,28 +97,8 @@ discriminator = dcgan.Model.Discriminator(
         dcgan.Model.BlockParam(
             blocks=1,
             strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
-        ),
-        dcgan.Model.BlockParam(
-            blocks=1,
-            strides=1
         )
-    ],
+    ] * 6,
     channels_first=True
 )
 

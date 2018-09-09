@@ -16,6 +16,9 @@ class Model(resnet.Model):
 
     [1] [Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks]
         (https://arxiv.org/pdf/1511.06434.pdf) by Alec Radford, Luke Metz, and Soumith Chintala, Nov 2015.
+
+    [2] [Which Training Methods for GANs do actually Converge?](https://arxiv.org/pdf/1801.04406.pdf)
+        by Lars Mescheder, Andreas Geiger, and Sebastian Nowozin, Jul 2018.
     """
 
     class Generator(object):
@@ -40,24 +43,20 @@ class Model(resnet.Model):
 
             with tf.variable_scope("generator", reuse=reuse):
 
-                strides_product = functools.partial(functools.reduce, operator.mul)(
-                    [block_param.strides for block_param in self.block_params]
-                )
-
                 inputs = tf.layers.dense(
                     inputs=inputs,
                     units=(
                         self.filters *
-                        self.image_size[0] // strides_product *
-                        self.image_size[1] // strides_product
+                        self.image_size[0] >> len(self.block_params)
+                        self.image_size[1] >> len(self.block_params)
                     )
                 )
 
                 inputs = util.chunk_images(
                     inputs=inputs,
                     image_size=[
-                        self.image_size[0] // strides_product,
-                        self.image_size[1] // strides_product
+                        self.image_size[0] >> len(self.block_params),
+                        self.image_size[1] >> len(self.block_params)
                     ],
                     data_format=self.data_format
                 )
