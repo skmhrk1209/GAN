@@ -58,6 +58,8 @@ def preprocess(path, channels_first):
     image = tf.image.resize_images(image, [256, 256])
     image = tf.transpose(image, [2, 0, 1] if channels_first else [0, 1, 2])
 
+    return image
+
 
 filenames = tf.placeholder(tf.string, shape=[None])
 training = tf.placeholder(tf.bool, shape=[])
