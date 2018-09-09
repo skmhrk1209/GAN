@@ -206,7 +206,9 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
     )
 
 config = tf.ConfigProto(
-    device_count={"GPU": 1}
+    gpu_options=tf.GPUOptions(
+        visible_device_list=args.gpu
+    )
 )
 
 with tf.Session(config=config) as session:
