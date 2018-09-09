@@ -202,8 +202,6 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
         global_step=generator_global_step
     )
 
-    # [SUPER SLOW]
-    # ????????????????????????????????
     discriminator_train_op = tf.train.AdamOptimizer().minimize(
         loss=discriminator_loss,
         var_list=discriminator_variables,
@@ -215,7 +213,7 @@ config = tf.ConfigProto(
         visible_device_list=args.gpu,
         allow_growth=True
     ),
-    log_device_placement=True,
+    log_device_placement=False,
     allow_soft_placement=True
 )
 
