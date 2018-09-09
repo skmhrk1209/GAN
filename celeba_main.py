@@ -209,8 +209,11 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
 
 config = tf.ConfigProto(
     gpu_options=tf.GPUOptions(
-        visible_device_list=args.gpu
-    )
+        visible_device_list=args.gpu,
+        allow_growth=True
+    ),
+    log_device_placement=True,
+    allow_soft_placement=True
 )
 
 with tf.Session(config=config) as session:
