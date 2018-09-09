@@ -181,7 +181,7 @@ discriminator_loss = tf.losses.sigmoid_cross_entropy(
 )
 
 gradient = tf.gradients(ys=real_logits, xs=[reals])
-gradient_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(gradient), axis=[1, 2, 3])) * 10.0
+gradient_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(gradient), axis=[1, 2, 3])) * 5.0
 
 discriminator_loss += gradient_penalty
 
@@ -199,6 +199,8 @@ with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
         global_step=generator_global_step
     )
 
+    # [SUPER SLOW]
+    # ????????????????????????????????
     discriminator_train_op = tf.train.AdamOptimizer().minimize(
         loss=discriminator_loss,
         var_list=discriminator_variables,
