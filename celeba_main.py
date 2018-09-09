@@ -51,13 +51,6 @@ def preprocess(path, channels_first):
     def scale(in_val, in_min, in_max, out_min, out_max):
         return out_min + (in_val - in_min) / (in_max - in_min) * (out_max - out_min)
 
-    def instance_noise(inputs):
-        return tf.random_normal(
-            shape=inputs.get_shape().as_list(),
-            mean=0.0,
-            stddev=0.1
-        )
-
     image = tf.read_file(path)
     image = tf.image.decode_jpeg(image, 3)
     image = tf.image.convert_image_dtype(image, tf.float32)
