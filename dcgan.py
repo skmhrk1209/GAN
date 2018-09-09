@@ -47,7 +47,7 @@ class Model(resnet.Model):
                     inputs=inputs,
                     units=(
                         self.filters *
-                        self.image_size[0] >> len(self.block_params),
+                        self.image_size[0] >> len(self.block_params) *
                         self.image_size[1] >> len(self.block_params)
                     )
                 )
