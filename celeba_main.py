@@ -25,7 +25,7 @@ args = parser.parse_args()
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
-def parse_fn(example, channels_first):
+def parse_fn(example):
 
     features = tf.parse_single_example(
         serialized=example,
@@ -43,13 +43,27 @@ def parse_fn(example, channels_first):
         }
     )
 
-    image = tf.read_file(features["path"])
+    return features["path"]
+
+
+def preprocess(path, channels_first):
+
+    def scale(in_val, in_min, in_max, out_min, out_max):
+        return out_min + (in_val - in_min) / (in_max - in_min) * (out_max - out_min)
+
+    def instance_noise(inputs):
+        return tf.random_normal(
+            shape=inputs.get_shape().as_list(),
+            mean=0.0,
+            stddev=0.1
+        )
+
+    image = tf.read_file(path)
     image = tf.image.decode_jpeg(image, 3)
     image = tf.image.convert_image_dtype(image, tf.float32)
+    image = scale(image, 0., 1., -1., 1.)
     image = tf.image.resize_images(image, [256, 256])
     image = tf.transpose(image, [2, 0, 1] if channels_first else [0, 1, 2])
-
-    return image
 
 
 filenames = tf.placeholder(tf.string, shape=[None])
@@ -61,7 +75,8 @@ batch_size = tf.placeholder(tf.int64, shape=[])
 dataset = tf.data.TFRecordDataset(filenames)
 dataset = dataset.shuffle(buffer_size)
 dataset = dataset.repeat(num_epochs)
-dataset = dataset.map(functools.partial(parse_fn, channels_first=True))
+dataset = dataset.map(parse_fn)
+dataset = dataset.map(functools.partial(preprocess, channels_first=True))
 dataset = dataset.batch(batch_size)
 dataset = dataset.prefetch(1)
 
@@ -140,10 +155,7 @@ discriminator_loss = tf.losses.sigmoid_cross_entropy(
     logits=concat_logits
 )
 
-real = reals[:1]
-real_logit = discriminator(real, training=training, reuse=True)
-
-gradient = tf.gradients(ys=real_logit, xs=[real])
+gradient = tf.gradients(ys=real_logits, xs=[reals])
 gradient_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(gradient), axis=[1, 2, 3])) * 5.0
 
 discriminator_loss += gradient_penalty
