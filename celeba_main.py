@@ -180,10 +180,9 @@ discriminator_loss = tf.losses.sigmoid_cross_entropy(
     logits=concat_logits
 )
 
-discriminator_loss += tf.reduce_mean(tf.map_fn(
-    fn=tf.nn.l2_loss,
-    elems=tf.gradients(ys=real_logits, xs=reals)[0])
-) * 10.0
+real = reals[:1]
+gradients = tf.gradients(ys=discriminator(real, training=training, reuse=True), xs=real)
+discriminator_loss += tf.nn.l2_loss(gradients) * 10.0
 
 generator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator")
 discriminator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator")
