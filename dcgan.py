@@ -85,8 +85,8 @@ class Model(resnet.Model):
                         block_fn=block_fn,
                         blocks=block_param.blocks,
                         filters=self.filters >> i,
-                        strides=1,
-                        projection_shortcut=None,
+                        strides=block_param.strides,
+                        projection_shortcut=projection_shortcut,
                         data_format=self.data_format,
                         training=training
                     )
@@ -154,8 +154,8 @@ class Model(resnet.Model):
                         block_fn=block_fn,
                         blocks=block_param.blocks,
                         filters=self.filters << i,
-                        strides=1,
-                        projection_shortcut=None,
+                        strides=block_param.strides,
+                        projection_shortcut=projection_shortcut,
                         data_format=self.data_format,
                         training=training
                     )
