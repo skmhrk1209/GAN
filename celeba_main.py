@@ -11,6 +11,7 @@ import functools
 import itertools
 import cv2
 import dcgan
+import util
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="celeba_dcgan_model", help="model directory")
@@ -48,15 +49,11 @@ def parse_fn(example):
 
 def preprocess(path, channels_first):
 
-    def scale(in_val, in_min, in_max, out_min, out_max):
-        return out_min + (in_val - in_min) / (in_max - in_min) * (out_max - out_min)
-
     image = tf.read_file(path)
     image = tf.image.decode_jpeg(image, 3)
     image = tf.image.resize_images(image, [256, 256])
     image = tf.transpose(image, [2, 0, 1] if channels_first else [0, 1, 2])
-
-    image = scale(image, 0., 1., -1., 1.)
+    image = util.scale(image, 0., 1., -1., 1.)
 
     return image
 
@@ -153,8 +150,8 @@ discriminator_loss = tf.losses.sigmoid_cross_entropy(
 real = reals[:1]
 real_logit = discriminator(real, training=training, reuse=True)
 
-gradient = tf.gradients(ys=real_logit, xs=[real])
-gradient_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(gradient), axis=[1, 2, 3])) * 5.0
+gradient = tf.gradients(ys=real_logit, xs=[real])[0]
+gradient_penalty = tf.nn.l2_loss(gradient) * 10.0
 
 discriminator_loss += gradient_penalty
 
@@ -325,7 +322,7 @@ with tf.Session(config=config) as session:
                 }
             )
 
-            cv2.imshow("image", cv2.cvtColor(images[0], cv2.COLOR_BGR2RGB))
+            cv2.imshow("image", util.scale(images[0], -1., 1., 0., 1.))
 
             if cv2.waitKey(1000) == ord("q"):
 

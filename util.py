@@ -55,3 +55,7 @@ def chunk_images(inputs, size, data_format):
 def get_channels(inputs, data_format):
 
     return inputs.get_shape().as_list()[(1 if data_format == "channels_first" else 3)]
+
+def scale(input, input_min, input_max, output_min, output_max):
+    
+    return output_min + (input - input_min) / (input_max - input_min) * (output_max - output_min)
