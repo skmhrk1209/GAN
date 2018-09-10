@@ -322,7 +322,10 @@ with tf.Session(config=config) as session:
                 }
             )
 
-            cv2.imshow("image", utils.scale(images[0], -1., 1., 0., 1.))
+            cv2.imwrite(
+                "image{}.jpeg".format(i),
+                utils.scale(images[0].transpose([1, 2, 0]), -1., 1., 0., 255.)
+            )
 
             if cv2.waitKey(1000) == ord("q"):
 
