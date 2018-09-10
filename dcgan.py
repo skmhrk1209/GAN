@@ -23,13 +23,13 @@ class Model(resnet.Model):
 
     class Generator(object):
 
-        def __init__(self, image_size, filters, bottleneck, version, block_params, final_conv_param, channels_first):
+        def __init__(self, image_size, filters, block_params, bottleneck, version, final_conv_param, channels_first):
 
             self.image_size = image_size
             self.filters = filters
+            self.block_params = block_params
             self.bottleneck = bottleneck
             self.version = version
-            self.block_params = block_params
             self.final_conv_param = final_conv_param
             self.channels_first = channels_first
             self.data_format = "channels_first" if channels_first else "channels_last"

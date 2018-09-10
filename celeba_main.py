@@ -15,7 +15,7 @@ import util
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="celeba_dcgan_model", help="model directory")
-parser.add_argument("--batch", type=int, default=50, help="batch size")
+parser.add_argument("--batch", type=int, default=100, help="batch size")
 parser.add_argument("--epochs", type=int, default=100, help="training epochs")
 parser.add_argument('--train', action="store_true", help="with training")
 parser.add_argument('--eval', action="store_true", help="with evaluation")
@@ -53,7 +53,7 @@ def preprocess(path, channels_first):
     image = tf.image.decode_jpeg(image, 3)
     image = tf.image.resize_images(image, [256, 256])
     image = tf.transpose(image, [2, 0, 1] if channels_first else [0, 1, 2])
-    image = util.scale(image, 0., 1., -1., 1.)
+    image = util.scale(image, 0., 255., -1., 1.)
 
     return image
 
@@ -77,14 +77,14 @@ iterator = dataset.make_initializable_iterator()
 generator = dcgan.Model.Generator(
     image_size=[256, 256],
     filters=1024,
-    bottleneck=False,
-    version=2,
     block_params=[
         dcgan.Model.BlockParam(
             blocks=1,
             strides=1
         )
     ] * 6,
+    bottleneck=False,
+    version=2,
     final_conv_param=dcgan.Model.ConvParam(
         kernel_size=3,
         strides=1
@@ -98,14 +98,14 @@ discriminator = dcgan.Model.Discriminator(
         kernel_size=3,
         strides=1
     ),
-    bottleneck=False,
-    version=2,
     block_params=[
         dcgan.Model.BlockParam(
             blocks=1,
             strides=1
         )
     ] * 6,
+    bottleneck=False,
+    version=2,
     channels_first=True
 )
 
