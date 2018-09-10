@@ -85,8 +85,8 @@ class Model(resnet.Model):
                         block_fn=block_fn,
                         blocks=block_param.blocks,
                         filters=self.filters >> i,
-                        strides=block_param.strides,
-                        projection_shortcut=projection_shortcut,
+                        strides=1,
+                        projection_shortcut=None,
                         data_format=self.data_format,
                         training=training
                     )
@@ -113,13 +113,13 @@ class Model(resnet.Model):
 
     class Discriminator(object):
 
-        def __init__(self, filters, initial_conv_param, bottleneck, version, block_params, channels_first):
+        def __init__(self, filters, initial_conv_param, block_params, bottleneck, version, channels_first):
 
             self.filters = filters
             self.initial_conv_param = initial_conv_param
+            self.block_params = block_params
             self.bottleneck = bottleneck
             self.version = version
-            self.block_params = block_params
             self.channels_first = channels_first
             self.data_format = "channels_first" if channels_first else "channels_last"
 
@@ -154,8 +154,8 @@ class Model(resnet.Model):
                         block_fn=block_fn,
                         blocks=block_param.blocks,
                         filters=self.filters << i,
-                        strides=block_param.strides,
-                        projection_shortcut=projection_shortcut,
+                        strides=1,
+                        projection_shortcut=None,
                         data_format=self.data_format,
                         training=training
                     )
