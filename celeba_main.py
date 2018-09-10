@@ -11,7 +11,7 @@ import functools
 import itertools
 import cv2
 import dcgan
-import util
+import utils
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", type=str, default="celeba_dcgan_model", help="model directory")
@@ -53,7 +53,7 @@ def preprocess(path, channels_first):
     image = tf.image.decode_jpeg(image, 3)
     image = tf.image.resize_images(image, [256, 256])
     image = tf.transpose(image, [2, 0, 1] if channels_first else [0, 1, 2])
-    image = util.scale(image, 0., 255., -1., 1.)
+    image = utils.scale(image, 0., 255., -1., 1.)
 
     return image
 
@@ -322,7 +322,7 @@ with tf.Session(config=config) as session:
                 }
             )
 
-            cv2.imshow("image", util.scale(images[0], -1., 1., 0., 1.))
+            cv2.imshow("image", utils.scale(images[0], -1., 1., 0., 1.))
 
             if cv2.waitKey(1000) == ord("q"):
 

@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 import collections
-import util
+import utils
 
 
 class Model(object):
@@ -58,7 +58,7 @@ class Model(object):
 
             if self.version == 1:
 
-                inputs = util.batch_normalization(self.data_format)(
+                inputs = utils.batch_normalization(self.data_format)(
                     inputs=inputs,
                     training=training,
                     fused=True
@@ -89,7 +89,7 @@ class Model(object):
 
             if self.version == 2:
 
-                inputs = util.batch_normalization(self.data_format)(
+                inputs = utils.batch_normalization(self.data_format)(
                     inputs=inputs,
                     training=training,
                     fused=True
@@ -97,7 +97,7 @@ class Model(object):
 
                 inputs = tf.nn.relu(inputs)
 
-            inputs = util.global_average_pooling2d(self.data_format)(inputs)
+            inputs = utils.global_average_pooling2d(self.data_format)(inputs)
 
             inputs = tf.layers.dense(
                 inputs=inputs,
@@ -120,7 +120,7 @@ class Model(object):
                 data_format=data_format
             )
 
-            shortcut = util.batch_normalization(data_format)(
+            shortcut = utils.batch_normalization(data_format)(
                 inputs=shortcut,
                 training=training,
                 fused=True
@@ -137,7 +137,7 @@ class Model(object):
             kernel_initializer=tf.variance_scaling_initializer(),
         )
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True
@@ -156,7 +156,7 @@ class Model(object):
             kernel_initializer=tf.variance_scaling_initializer(),
         )
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True
@@ -173,7 +173,7 @@ class Model(object):
 
         shortcut = inputs
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True
@@ -201,7 +201,7 @@ class Model(object):
             kernel_initializer=tf.variance_scaling_initializer(),
         )
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True
@@ -238,7 +238,7 @@ class Model(object):
                 data_format=data_format
             )
 
-            shortcut = util.batch_normalization(data_format)(
+            shortcut = utils.batch_normalization(data_format)(
                 inputs=shortcut,
                 training=training,
                 fused=True
@@ -255,7 +255,7 @@ class Model(object):
             kernel_initializer=tf.variance_scaling_initializer(),
         )
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True
@@ -274,7 +274,7 @@ class Model(object):
             kernel_initializer=tf.variance_scaling_initializer(),
         )
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True
@@ -293,7 +293,7 @@ class Model(object):
             kernel_initializer=tf.variance_scaling_initializer(),
         )
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True
@@ -310,7 +310,7 @@ class Model(object):
 
         shortcut = inputs
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True
@@ -338,7 +338,7 @@ class Model(object):
             kernel_initializer=tf.variance_scaling_initializer(),
         )
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True
@@ -357,7 +357,7 @@ class Model(object):
             kernel_initializer=tf.variance_scaling_initializer(),
         )
 
-        inputs = util.batch_normalization(data_format)(
+        inputs = utils.batch_normalization(data_format)(
             inputs=inputs,
             training=training,
             fused=True

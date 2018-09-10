@@ -7,7 +7,7 @@ import collections
 import functools
 import operator
 import resnet
-import util
+import utils
 
 
 class Model(resnet.Model):
@@ -20,6 +20,19 @@ class Model(resnet.Model):
     [2] [Which Training Methods for GANs do actually Converge?](https://arxiv.org/pdf/1801.04406.pdf)
         by Lars Mescheder, Andreas Geiger, and Sebastian Nowozin, Jul 2018.
     """
+
+    # NO BATCH NORMALIZATION
+    # D(X)のgradientの計算コストが大きいから？
+    # 実際計算が終わらない
+    # batch normalization無しであればバッチ内の1データxについて
+    # D(x)のgradientを求めれば良い
+
+    # generator側のresblockはbottleneck使うのは気持ち悪い
+    # resnet basedなアーキテクチャのconv層はbias無しにするべき？
+
+    # instance noise未実装
+    # 分散の求め方が不明
+    # 焼きなましで求めると書いてあるような気がするけどそもそも目的関数は何？
 
     class Generator(object):
 
@@ -52,7 +65,7 @@ class Model(resnet.Model):
                     )
                 )
 
-                inputs = util.chunk_images(
+                inputs = utils.chunk_images(
                     inputs=inputs,
                     size=[
                         (self.image_size[0] >> len(self.block_params)),
@@ -78,7 +91,7 @@ class Model(resnet.Model):
                         training=training
                     )
 
-                    inputs = util.up_sampling2d(2, self.data_format)(inputs)
+                    inputs = utils.up_sampling2d(2, self.data_format)(inputs)
 
                 if self.version == 2:
 
@@ -159,7 +172,7 @@ class Model(resnet.Model):
 
                     inputs = tf.nn.leaky_relu(inputs)
 
-                inputs = util.global_average_pooling2d(self.data_format)(inputs)
+                inputs = utils.global_average_pooling2d(self.data_format)(inputs)
 
                 inputs = tf.layers.dense(
                     inputs=inputs,
