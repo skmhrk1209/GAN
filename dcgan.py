@@ -172,7 +172,7 @@ class Model(resnet.Model):
 
                     inputs = tf.nn.leaky_relu(inputs)
 
-                inputs = utils.global_average_pooling2d(self.data_format)(inputs)
+                inputs = tf.layers.flatten(inputs)
 
                 inputs = tf.layers.dense(
                     inputs=inputs,
