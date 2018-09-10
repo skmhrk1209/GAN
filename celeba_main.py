@@ -68,7 +68,7 @@ dataset = tf.data.TFRecordDataset(filenames)
 dataset = dataset.shuffle(buffer_size)
 dataset = dataset.repeat(num_epochs)
 dataset = dataset.map(parse_fn)
-dataset = dataset.map(functools.partial(preprocess, channels_first=True))
+dataset = dataset.map(functools.partial(preprocess, channels_first=False))
 dataset = dataset.batch(batch_size)
 dataset = dataset.prefetch(1)
 
@@ -89,7 +89,7 @@ generator = dcgan.Model.Generator(
         kernel_size=3,
         strides=1
     ),
-    channels_first=True
+    channels_first=False
 )
 
 discriminator = dcgan.Model.Discriminator(
@@ -106,7 +106,7 @@ discriminator = dcgan.Model.Discriminator(
     ] * 6,
     bottleneck=False,
     version=2,
-    channels_first=True
+    channels_first=False
 )
 
 latents = tf.placeholder(tf.float32, shape=[None, 256])
@@ -322,10 +322,7 @@ with tf.Session(config=config) as session:
                 }
             )
 
-            cv2.imwrite(
-                "image{}.jpeg".format(i),
-                utils.scale(images[0].transpose([1, 2, 0]), -1., 1., 0., 255.)
-            )
+            cv2.imshow("image", utils.scale(images[0], -1., 1., 0., 255.))
 
             if cv2.waitKey(1000) == ord("q"):
 
