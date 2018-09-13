@@ -47,12 +47,12 @@ class Model(resnet.Model):
             self.channels_first = channels_first
             self.data_format = "channels_first" if channels_first else "channels_last"
 
+            self.block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
+                             (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
+
+            self.projection_shortcut = Model.projection_shortcut
+
         def __call__(self, inputs, training, reuse=False):
-
-            block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
-                        (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
-
-            projection_shortcut = Model.projection_shortcut
 
             with tf.variable_scope("generator", reuse=reuse):
 
@@ -82,11 +82,11 @@ class Model(resnet.Model):
 
                     inputs = Model.block_layer(
                         inputs=inputs,
-                        block_fn=block_fn,
+                        block_fn=self.block_fn,
                         blocks=block_param.blocks,
                         filters=self.filters >> i,
                         strides=block_param.strides,
-                        projection_shortcut=projection_shortcut,
+                        projection_shortcut=self.projection_shortcut,
                         data_format=self.data_format,
                         training=training
                     )
@@ -123,12 +123,12 @@ class Model(resnet.Model):
             self.channels_first = channels_first
             self.data_format = "channels_first" if channels_first else "channels_last"
 
+            self.block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
+                             (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
+
+            self.projection_shortcut = Model.projection_shortcut
+
         def __call__(self, inputs, training, reuse=False):
-
-            block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
-                        (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
-
-            projection_shortcut = Model.projection_shortcut
 
             with tf.variable_scope("discriminator", reuse=reuse):
 
@@ -151,11 +151,11 @@ class Model(resnet.Model):
 
                     inputs = Model.block_layer(
                         inputs=inputs,
-                        block_fn=block_fn,
+                        block_fn=self.block_fn,
                         blocks=block_param.blocks,
                         filters=self.filters << i,
                         strides=block_param.strides,
-                        projection_shortcut=projection_shortcut,
+                        projection_shortcut=self.projection_shortcut,
                         data_format=self.data_format,
                         training=training
                     )

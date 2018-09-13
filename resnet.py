@@ -24,24 +24,25 @@ class Model(object):
     DenseParam = collections.namedtuple("DenseParam", ("units"))
 
     def __init__(self, filters, initial_conv_param, initial_pool_param,
-                 bottleneck, version, block_params, logit_param, channels_first):
+                 block_params, bottleneck, version,
+                 logits_param, channels_first):
 
         self.filters = filters
         self.initial_conv_param = initial_conv_param
         self.initial_pool_param = initial_pool_param
+        self.block_params = block_params
         self.bottleneck = bottleneck
         self.version = version
-        self.block_params = block_params
-        self.logit_param = logit_param
+        self.logits_param = logits_param
         self.channels_first = channels_first
         self.data_format = "channels_first" if channels_first else "channels_last"
 
+        self.block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
+                         (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
+
+        self.projection_shortcut = Model.projection_shortcut
+
     def __call__(self, inputs, training):
-
-        block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
-                    (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
-
-        projection_shortcut = Model.projection_shortcut
 
         with tf.variable_scope("resnet"):
 
@@ -78,11 +79,11 @@ class Model(object):
 
                 inputs = Model.block_layer(
                     inputs=inputs,
-                    block_fn=block_fn,
+                    block_fn=self.block_fn,
                     blocks=block_param.blocks,
                     filters=self.filters << i,
                     strides=block_param.strides,
-                    projection_shortcut=projection_shortcut,
+                    projection_shortcut=self.projection_shortcut,
                     data_format=self.data_format,
                     training=training
                 )
@@ -101,7 +102,7 @@ class Model(object):
 
             inputs = tf.layers.dense(
                 inputs=inputs,
-                units=self.logit_param.units
+                units=self.logits_param.units
             )
 
             return inputs
