@@ -3,11 +3,11 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import numpy as np
 import collections
 import functools
 import operator
 import resnet
-import utils
 
 
 class Model(resnet.Model):
@@ -36,7 +36,7 @@ class Model(resnet.Model):
 
     class Generator(object):
 
-        def __init__(self, image_size, filters, block_params, bottleneck, version, final_conv_param, channels_first):
+        def __init__(self, image_size, filters, block_params, bottleneck, version, final_conv_param):
 
             self.image_size = image_size
             self.filters = filters
@@ -44,34 +44,27 @@ class Model(resnet.Model):
             self.bottleneck = bottleneck
             self.version = version
             self.final_conv_param = final_conv_param
-            self.channels_first = channels_first
-            self.data_format = "channels_first" if channels_first else "channels_last"
 
             self.block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
                              (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
 
             self.projection_shortcut = Model.projection_shortcut
 
-        def __call__(self, inputs, training, reuse=False):
+        def __call__(self, inputs, data_format, training, reuse=False):
 
             with tf.variable_scope("generator", reuse=reuse):
 
+                initial_image_size = [size >> len(self.block_params) for size in self.image_size]
+
                 inputs = tf.layers.dense(
                     inputs=inputs,
-                    units=(
-                        self.filters *
-                        (self.image_size[0] >> len(self.block_params)) *
-                        (self.image_size[1] >> len(self.block_params))
-                    )
+                    units=self.filters * functools.reduce(operator.mul, initial_image_size)
                 )
 
-                inputs = utils.chunk_images(
-                    inputs=inputs,
-                    size=[
-                        (self.image_size[0] >> len(self.block_params)),
-                        (self.image_size[1] >> len(self.block_params))
-                    ],
-                    data_format=self.data_format
+                inputs = tf.reshape(
+                    tensor=inputs,
+                    shape=([-1] + [self.filters] + initial_image_size if data_format == "channels_first" else
+                           [-1] + initial_image_size + [self.filters])
                 )
 
                 if self.version == 1:
@@ -87,11 +80,14 @@ class Model(resnet.Model):
                         filters=self.filters >> i,
                         strides=block_param.strides,
                         projection_shortcut=self.projection_shortcut,
-                        data_format=self.data_format,
+                        data_format=data_format,
                         training=training
                     )
 
-                    inputs = utils.up_sampling2d(2, self.data_format)(inputs)
+                    inputs = tf.keras.layers.UpSampling2D(
+                        size=2,
+                        data_format=data_format
+                    )(inputs)
 
                 if self.version == 2:
 
@@ -103,7 +99,7 @@ class Model(resnet.Model):
                     kernel_size=self.final_conv_param.kernel_size,
                     strides=self.final_conv_param.strides,
                     padding="same",
-                    data_format=self.data_format,
+                    data_format=data_format,
                     kernel_initializer=tf.variance_scaling_initializer(),
                 )
 
@@ -113,22 +109,20 @@ class Model(resnet.Model):
 
     class Discriminator(object):
 
-        def __init__(self, filters, initial_conv_param, block_params, bottleneck, version, channels_first):
+        def __init__(self, filters, initial_conv_param, block_params, bottleneck, version):
 
             self.filters = filters
             self.initial_conv_param = initial_conv_param
             self.block_params = block_params
             self.bottleneck = bottleneck
             self.version = version
-            self.channels_first = channels_first
-            self.data_format = "channels_first" if channels_first else "channels_last"
 
             self.block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
                              (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
 
             self.projection_shortcut = Model.projection_shortcut
 
-        def __call__(self, inputs, training, reuse=False):
+        def __call__(self, inputs, data_format, training, reuse=False):
 
             with tf.variable_scope("discriminator", reuse=reuse):
 
@@ -138,7 +132,7 @@ class Model(resnet.Model):
                     kernel_size=self.initial_conv_param.kernel_size,
                     strides=self.initial_conv_param.strides,
                     padding="same",
-                    data_format=self.data_format,
+                    data_format=data_format,
                     use_bias=False,
                     kernel_initializer=tf.variance_scaling_initializer(),
                 )
@@ -156,7 +150,7 @@ class Model(resnet.Model):
                         filters=self.filters << i,
                         strides=block_param.strides,
                         projection_shortcut=self.projection_shortcut,
-                        data_format=self.data_format,
+                        data_format=data_format,
                         training=training
                     )
 
@@ -165,7 +159,7 @@ class Model(resnet.Model):
                         pool_size=2,
                         strides=2,
                         padding="same",
-                        data_format=self.data_format
+                        data_format=data_format
                     )
 
                 if self.version == 2:
