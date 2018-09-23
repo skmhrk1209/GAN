@@ -157,8 +157,7 @@ discriminator_loss = tf.losses.sigmoid_cross_entropy(
     logits=concat_logits
 )
 
-gradient = tf.gradients(ys=real_logits, xs=[reals])
-print(len(gradient))
+gradient = tf.gradients(ys=real_logits, xs=[reals])[0]
 gradient_penalty = tf.nn.l2_loss(gradient) * 10.0
 
 discriminator_loss += gradient_penalty
