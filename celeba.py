@@ -222,7 +222,7 @@ with tf.Session(config=config) as session:
             session.run(
                 iterator.initializer,
                 feed_dict={
-                    filenames: ["train.tfrecord"],
+                    filenames: ["data/train.tfrecord"],
                     batch_size: args.batch_size,
                     num_epochs: args.num_epochs,
                     buffer_size: 180000
@@ -276,7 +276,7 @@ with tf.Session(config=config) as session:
             session.run(
                 iterator.initializer,
                 feed_dict={
-                    filenames: ["eval.tfrecord"],
+                    filenames: ["data/test.tfrecord"],
                     batch_size: args.batch_size,
                     num_epochs: 1,
                     buffer_size: 20000
