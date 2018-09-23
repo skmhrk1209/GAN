@@ -22,10 +22,6 @@ class Model(resnet.Model):
     """
 
     # NO BATCH NORMALIZATION
-    # D(X)のgradientの計算コストが大きいから？
-    # 実際計算が終わらない
-    # batch normalization無しであればバッチ内の1データxについて
-    # D(x)のgradientを求めれば良い
 
     # generator側のresblockはbottleneck使うのは気持ち悪い
     # resnet basedなアーキテクチャのconv層はbias無しにするべき？
