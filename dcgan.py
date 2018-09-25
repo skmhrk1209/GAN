@@ -4,13 +4,16 @@ from __future__ import print_function
 
 import tensorflow as tf
 import numpy as np
+import ops
+import utils
+import os
+import itertools
 import collections
-import functools
-import operator
-import resnet
+import time
+import cv2
 
 
-class Model(resnet.Model):
+class Model(object):
 
     """ implementation of DCGAN in TensorFlow
 
@@ -21,354 +24,473 @@ class Model(resnet.Model):
         by Lars Mescheder, Andreas Geiger, and Sebastian Nowozin, Jul 2018.
     """
 
-    # NO BATCH NORMALIZATION
-
-    # generator側のresblockはbottleneck使うのは気持ち悪い
-    # resnet basedなアーキテクチャのconv層はbias無しにするべき？
-
-    # instance noise未実装
-    # 分散の求め方が不明
-    # 焼きなましで求めると書いてあるような気がするけどそもそも目的関数は何？
+    ConvParam = collections.namedtuple("ConvParam", ("kernel_size", "strides"))
+    PoolParam = collections.namedtuple("PoolParam", ("pool_size", "strides"))
+    BlockParam = collections.namedtuple("BlockParam", ("blocks", "strides"))
+    GeneratorParam = collections.namedtuple("GeneratorParam", ("image_size", "filters",
+                                                               "block_params", "conv_param", "data_format"))
+    DiscriminatorParam = collections.namedtuple("DiscriminatorParam", ("filters", "conv_param", "block_params", "data_format"))
+    HyperParam = collections.namedtuple("HyperParam", ("latent_dimension", "gradient_coefficient"))
+    DatasetParam = collections.namedtuple("DatasetParam", ("filenames", "batch_size", "num_epochs", "buffer_size"))
 
     class Generator(object):
 
-        def __init__(self, image_size, filters, block_params, bottleneck, version, final_conv_param):
+        def __init__(self, image_size, filters, block_params, conv_param, data_format):
 
             self.image_size = image_size
             self.filters = filters
             self.block_params = block_params
-            self.bottleneck = bottleneck
-            self.version = version
-            self.final_conv_param = final_conv_param
+            self.conv_param = conv_param
+            self.data_format = data_format
 
-            self.block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
-                             (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
+        def __call__(self, inputs, training, name="generator", reuse=False):
 
-            self.projection_shortcut = Model.projection_shortcut
+            with tf.variable_scope(name, reuse=reuse):
 
-        def __call__(self, inputs, data_format, training, reuse=False):
-
-            with tf.variable_scope("generator", reuse=reuse):
-
-                initial_image_size = [size >> len(self.block_params) for size in self.image_size]
-
-                inputs = tf.layers.dense(
+                inputs = ops.dense_block(
                     inputs=inputs,
-                    units=self.filters * functools.reduce(operator.mul, initial_image_size)
+                    units=self.filters * np.prod(self.image_size),
+                    normalization=None,
+                    activation=tf.nn.leaky_relu,
+                    data_format=self.data_format,
+                    training=training
                 )
 
                 inputs = tf.reshape(
                     tensor=inputs,
-                    shape=([-1] + [self.filters] + initial_image_size if data_format == "channels_first" else
-                           [-1] + initial_image_size + [self.filters])
+                    shape=([-1] + [self.filters] + self.image_size if self.data_format == "channels_first" else
+                           [-1] + self.image_size + [self.filters])
                 )
-
-                if self.version == 1:
-
-                    inputs = tf.nn.leaky_relu(inputs)
 
                 for i, block_param in enumerate(self.block_params):
 
-                    inputs = Model.block_layer(
+                    inputs = ops.residual_block(
                         inputs=inputs,
-                        block_fn=self.block_fn,
-                        blocks=block_param.blocks,
                         filters=self.filters >> i,
                         strides=block_param.strides,
-                        projection_shortcut=self.projection_shortcut,
-                        data_format=data_format,
+                        normalization=None,
+                        activation=tf.nn.leaky_relu,
+                        data_format=self.data_format,
                         training=training
                     )
 
-                    inputs = tf.keras.layers.UpSampling2D(
+                    for _ in range(1, block_param.blocks):
+
+                        inputs = ops.residual_block(
+                            inputs=inputs,
+                            filters=self.filters >> i,
+                            strides=1,
+                            normalization=None,
+                            activation=tf.nn.leaky_relu,
+                            data_format=self.data_format,
+                            training=training
+                        )
+
+                    inputs = ops.upsampling2d(
+                        inputs=inputs,
                         size=2,
-                        data_format=data_format
-                    )(inputs)
+                        data_format=self.data_format
+                    )
 
-                if self.version == 2:
-
-                    inputs = tf.nn.leaky_relu(inputs)
-
-                inputs = tf.layers.conv2d(
+                inputs = ops.conv2d_block(
                     inputs=inputs,
                     filters=3,
-                    kernel_size=self.final_conv_param.kernel_size,
-                    strides=self.final_conv_param.strides,
-                    padding="same",
-                    data_format=data_format,
-                    kernel_initializer=tf.variance_scaling_initializer(),
+                    kernel_size=self.conv_param.kernel_size,
+                    strides=self.conv_param.strides,
+                    normalization=None,
+                    activation=tf.nn.tanh,
+                    data_format=self.data_format,
+                    training=training
                 )
-
-                inputs = tf.nn.tanh(inputs)
 
                 return inputs
 
     class Discriminator(object):
 
-        def __init__(self, filters, initial_conv_param, block_params, bottleneck, version):
+        def __init__(self, filters, conv_param, block_params, data_format):
 
+            self.conv_param = conv_param
             self.filters = filters
-            self.initial_conv_param = initial_conv_param
             self.block_params = block_params
-            self.bottleneck = bottleneck
-            self.version = version
+            self.data_format = data_format
 
-            self.block_fn = ((Model.bottleneck_block_v1 if self.version == 1 else Model.bottleneck_block_v2) if self.bottleneck else
-                             (Model.building_block_v1 if self.version == 1 else Model.building_block_v2))
+        def __call__(self, inputs, training, name="discriminator", reuse=False):
 
-            self.projection_shortcut = Model.projection_shortcut
+            with tf.variable_scope(name, reuse=reuse):
 
-        def __call__(self, inputs, data_format, training, reuse=False):
-
-            with tf.variable_scope("discriminator", reuse=reuse):
-
-                inputs = tf.layers.conv2d(
+                inputs = ops.conv2d_block(
                     inputs=inputs,
                     filters=self.filters,
-                    kernel_size=self.initial_conv_param.kernel_size,
-                    strides=self.initial_conv_param.strides,
-                    padding="same",
-                    data_format=data_format,
-                    use_bias=False,
-                    kernel_initializer=tf.variance_scaling_initializer(),
+                    kernel_size=self.conv_param.kernel_size,
+                    strides=self.conv_param.strides,
+                    normalization=None,
+                    activation=tf.nn.leaky_relu,
+                    data_format=self.data_format,
+                    training=training
                 )
-
-                if self.version == 1:
-
-                    inputs = tf.nn.leaky_relu(inputs)
 
                 for i, block_param in enumerate(self.block_params):
 
-                    inputs = Model.block_layer(
+                    inputs = ops.residual_block(
                         inputs=inputs,
-                        block_fn=self.block_fn,
-                        blocks=block_param.blocks,
                         filters=self.filters << i,
                         strides=block_param.strides,
-                        projection_shortcut=self.projection_shortcut,
-                        data_format=data_format,
+                        normalization=None,
+                        activation=tf.nn.leaky_relu,
+                        data_format=self.data_format,
                         training=training
                     )
+
+                    for _ in range(1, block_param.blocks):
+
+                        inputs = ops.residual_block(
+                            inputs=inputs,
+                            filters=self.filters << i,
+                            strides=1,
+                            normalization=None,
+                            activation=tf.nn.leaky_relu,
+                            data_format=self.data_format,
+                            training=training
+                        )
 
                     inputs = tf.layers.average_pooling2d(
                         inputs=inputs,
                         pool_size=2,
                         strides=2,
                         padding="same",
-                        data_format=data_format
+                        data_format=self.data_format
                     )
-
-                if self.version == 2:
-
-                    inputs = tf.nn.leaky_relu(inputs)
 
                 inputs = tf.layers.flatten(inputs)
 
-                inputs = tf.layers.dense(
+                inputs = ops.dense_block(
                     inputs=inputs,
-                    units=1
+                    units=1,
+                    normalization=None,
+                    activation=None,
+                    data_format=self.data_format,
+                    training=training
                 )
 
                 return inputs
 
-    @staticmethod
-    def building_block_v1(inputs, filters, strides, projection_shortcut, data_format, training):
+    def __init__(self, Dataset, generator_param, discriminator_param, hyper_param):
 
-        shortcut = inputs
+        self.dataset = Dataset()
 
-        if projection_shortcut:
+        self.generator = Model.Generator(
+            image_size=generator_param.image_size,
+            filters=generator_param.filters,
+            block_params=generator_param.block_params,
+            conv_param=generator_param.conv_param,
+            data_format=generator_param.data_format
+        )
 
-            shortcut = projection_shortcut(
-                inputs=inputs,
-                filters=filters,
-                strides=strides,
-                data_format=data_format
+        self.discriminator = Model.Discriminator(
+            filters=discriminator_param.filters,
+            conv_param=discriminator_param.conv_param,
+            block_params=discriminator_param.block_params,
+            data_format=discriminator_param.data_format
+        )
+
+        self.latents = tf.placeholder(dtype=tf.float32, shape=[None, hyper_param.latent_dimension])
+        self.training = tf.placeholder(dtype=tf.bool, shape=[])
+        self.gradient_coefficient = tf.constant(value=hyper_param.gradient_coefficient, dtype=tf.float32)
+
+        self.reals = self.dataset.input()
+
+        self.fakes = self.generator(
+            inputs=self.latents,
+            training=self.training,
+            name="generator",
+            reuse=False
+        )
+
+        self.real_logits = self.discriminator(
+            inputs=self.reals,
+            training=self.training,
+            name="discriminator",
+            reuse=False
+        )
+
+        self.fake_logits = self.discriminator(
+            inputs=self.fakes,
+            training=self.training,
+            name="discriminator",
+            reuse=True
+        )
+
+        self.generator_loss = tf.losses.sigmoid_cross_entropy(
+            multi_class_labels=tf.ones_like(self.fake_logits),
+            logits=self.fake_logits
+        )
+
+        self.discriminator_loss = tf.losses.sigmoid_cross_entropy(
+            multi_class_labels=tf.concat([tf.ones_like(self.real_logits), tf.zeros_like(self.fake_logits)], axis=0),
+            logits=tf.concat([self.real_logits, self.fake_logits], axis=0)
+        )
+
+        self.gradient_penalty = tf.nn.l2_loss(tf.gradients(ys=self.real_logits, xs=[self.reals])[0])
+        self.discriminator_loss += self.gradient_penalty * self.gradient_coefficient
+
+        self.generator_eval_metric_op = tf.metrics.accuracy(
+            labels=tf.ones_like(self.fake_logits),
+            predictions=tf.round(self.fake_logits)
+        )
+
+        self.discriminator_eval_metric_op = tf.metrics.accuracy(
+            labels=tf.concat([tf.zeros_like(self.fake_logits), tf.ones_like(self.real_logits)], axis=0),
+            predictions=tf.round(tf.concat([self.fake_logits, self.real_logits], axis=0))
+        )
+
+        self.generator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator")
+        self.discriminator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator")
+
+        self.generator_global_step = tf.Variable(initial_value=0, trainable=False)
+        self.discriminator_global_step = tf.Variable(initial_value=0, trainable=False)
+
+        self.generator_optimizer = tf.train.AdamOptimizer()
+        self.discriminator_optimizer = tf.train.AdamOptimizer()
+
+        self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+
+        with tf.control_dependencies(self.update_ops):
+
+            self.generator_train_op = self.generator_optimizer.minimize(
+                loss=self.generator_loss,
+                var_list=self.generator_variables,
+                global_step=self.generator_global_step
             )
 
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters,
-            kernel_size=3,
-            strides=strides,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
-
-        inputs = tf.nn.leaky_relu(inputs)
-
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters,
-            kernel_size=3,
-            strides=1,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
-
-        inputs += shortcut
-
-        inputs = tf.nn.leaky_relu(inputs)
-
-        return inputs
-
-    @staticmethod
-    def building_block_v2(inputs, filters, strides, projection_shortcut, data_format, training):
-
-        shortcut = inputs
-
-        inputs = tf.nn.leaky_relu(inputs)
-
-        if projection_shortcut:
-
-            shortcut = projection_shortcut(
-                inputs=inputs,
-                filters=filters,
-                strides=strides,
-                data_format=data_format
+            self.discriminator_train_op = self.discriminator_optimizer.minimize(
+                loss=self.discriminator_loss,
+                var_list=self.discriminator_variables,
+                global_step=self.discriminator_global_step
             )
 
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters,
-            kernel_size=3,
-            strides=strides,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
+    def initialize(self, model_dir):
 
-        inputs = tf.nn.leaky_relu(inputs)
+        session = tf.get_default_session()
 
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters,
-            kernel_size=3,
-            strides=1,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
+        session.run(tf.local_variables_initializer())
 
-        inputs += shortcut
+        print("local variables initialized")
 
-        return inputs
+        saver = tf.train.Saver()
 
-    @staticmethod
-    def bottleneck_block_v1(inputs, filters, strides, projection_shortcut, data_format, training):
+        checkpoint = tf.train.latest_checkpoint(model_dir)
 
-        shortcut = inputs
+        if checkpoint:
 
-        if projection_shortcut:
+            saver.restore(session, checkpoint)
 
-            shortcut = projection_shortcut(
-                inputs=inputs,
-                filters=filters << 2,
-                strides=strides,
-                data_format=data_format
-            )
+            print(checkpoint, "loaded")
 
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters,
-            kernel_size=1,
-            strides=1,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
+        else:
 
-        inputs = tf.nn.leaky_relu(inputs)
+            session.run(tf.global_variables_initializer())
 
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters,
-            kernel_size=3,
-            strides=strides,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
+            print("global variables initialized")
 
-        inputs = tf.nn.leaky_relu(inputs)
+        return saver
 
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters << 2,
-            kernel_size=1,
-            strides=1,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
+    def train(self, model_dir, dataset_param, config):
 
-        inputs += shortcut
+        with tf.Session(config=config) as session:
 
-        inputs = tf.nn.leaky_relu(inputs)
+            saver = self.initialize(model_dir)
 
-        return inputs
+            try:
 
-    @staticmethod
-    def bottleneck_block_v2(inputs, filters, strides, projection_shortcut, data_format, training):
+                print("training started")
 
-        shortcut = inputs
+                start = time.time()
 
-        inputs = tf.nn.leaky_relu(inputs)
+                self.dataset.initialize(
+                    filenames=dataset_param.filenames,
+                    batch_size=dataset_param.batch_size,
+                    num_epochs=dataset_param.num_epochs,
+                    buffer_size=dataset_param.buffer_size
+                )
 
-        if projection_shortcut:
+                for i in itertools.count():
 
-            shortcut = projection_shortcut(
-                inputs=inputs,
-                filters=filters << 2,
-                strides=strides,
-                data_format=data_format
-            )
+                    latents = np.random.normal(
+                        loc=0.0,
+                        scale=1.0,
+                        size=[dataset_param.batch_size, self.latents.shape[1]]
+                    )
 
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters,
-            kernel_size=1,
-            strides=1,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
+                    session.run(
+                        [self.generator_train_op],
+                        feed_dict={
+                            self.latents: latents,
+                            self.training: True
+                        }
+                    )
 
-        inputs = tf.nn.leaky_relu(inputs)
+                    session.run(
+                        [self.discriminator_train_op],
+                        feed_dict={
+                            self.latents: latents,
+                            self.training: True
+                        }
+                    )
 
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters,
-            kernel_size=3,
-            strides=strides,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
+                    if i % 100 == 0:
 
-        inputs = tf.nn.leaky_relu(inputs)
+                        generator_global_step, generator_loss = session.run(
+                            [self.generator_global_step, self.generator_loss],
+                            feed_dict={
+                                self.latents: latents,
+                                self.training: True
+                            }
+                        )
 
-        inputs = tf.layers.conv2d(
-            inputs=inputs,
-            filters=filters << 2,
-            kernel_size=1,
-            strides=1,
-            padding="same",
-            data_format=data_format,
-            use_bias=False,
-            kernel_initializer=tf.variance_scaling_initializer(),
-        )
+                        print("global_step: {}, generator_loss: {:.1f}".format(
+                            generator_global_step,
+                            generator_loss
+                        ))
 
-        inputs += shortcut
+                        discriminator_global_step, discriminator_loss = session.run(
+                            [self.discriminator_global_step, self.discriminator_loss],
+                            feed_dict={
+                                self.latents: latents,
+                                self.training: True
+                            }
+                        )
 
-        return inputs
+                        print("global_step: {}, discriminator_loss: {:.1f}".format(
+                            discriminator_global_step,
+                            discriminator_loss
+                        ))
+
+                        checkpoint = saver.save(
+                            sess=session,
+                            save_path=os.path.join(model_dir, "model.ckpt"),
+                            global_step=generator_global_step
+                        )
+
+                        stop = time.time()
+
+                        print("{} saved ({:.1f} sec)".format(checkpoint, stop - start))
+
+                        start = time.time()
+
+                        reals, fakes = session.run(
+                            [self.reals, self.fakes],
+                            feed_dict={
+                                self.latents: latents,
+                                self.training: True
+                            }
+                        )
+
+                        images = np.concatenate([reals, fakes], axis=2)
+
+                        images = utils.scale(images, -1, 1, 0, 1)
+
+                        for image in images:
+
+                            cv2.imshow("image", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
+                            cv2.waitKey(1000)
+
+            except tf.errors.OutOfRangeError:
+
+                print("training ended")
+
+    def evaluate(self, model_dir, dataset_param, config):
+
+        with tf.Session(config=config) as session:
+
+            self.initialize(model_dir)
+
+            try:
+
+                print("evaluation started")
+
+                self.dataset.initialize(
+                    filenames=dataset_param.filenames,
+                    batch_size=dataset_param.batch_size,
+                    num_epochs=dataset_param.num_epochs,
+                    buffer_size=dataset_param.buffer_size
+                )
+
+                for i in itertools.count():
+
+                    latents = np.random.normal(
+                        loc=0.0,
+                        scale=1.0,
+                        size=[dataset_param.batch_size, self.latents.shape[1]]
+                    )
+
+                    generator_accuracy = session.run(
+                        [self.generator_eval_metric_op],
+                        feed_dict={
+                            self.latents: latents,
+                            self.training: False
+                        }
+                    )
+
+                    print("generator_accuracy: {:.1f}".format(generator_accuracy))
+
+                    discriminator_accuracy = session.run(
+                        [self.discriminator_eval_metric_op],
+                        feed_dict={
+                            self.latents: latents,
+                            self.training: False
+                        }
+                    )
+
+                    print("discriminator_accuracy: {:.1f}".format(discriminator_accuracy))
+
+            except tf.errors.OutOfRangeError:
+
+                print("evaluation ended")
+
+    def predict(self, model_dir, dataset_param, config):
+
+        with tf.Session(config=config) as session:
+
+            self.initialize(model_dir)
+
+            try:
+
+                print("prediction started")
+
+                self.dataset.initialize(
+                    filenames=dataset_param.filenames,
+                    batch_size=dataset_param.batch_size,
+                    num_epochs=dataset_param.num_epochs,
+                    buffer_size=dataset_param.buffer_size
+                )
+
+                for i in itertools.count():
+
+                    latents = np.random.normal(
+                        loc=0.0,
+                        scale=1.0,
+                        size=[dataset_param.batch_size, self.latents.shape[1]]
+                    )
+
+                    reals, fakes = session.run(
+                        [self.reals, self.fakes],
+                        feed_dict={
+                            self.latents: latents,
+                            self.training: False
+                        }
+                    )
+
+                    images = np.concatenate([reals, fakes], axis=2)
+
+                    images = utils.scale(images, -1, 1, 0, 1)
+
+                    for image in images:
+
+                        cv2.imshow("image", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
+                        cv2.waitKey(1000)
+
+            except tf.errors.OutOfRangeError:
+
+                print("prediction ended")

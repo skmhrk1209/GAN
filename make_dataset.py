@@ -1,18 +1,11 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import numpy as np
 import tensorflow as tf
 import argparse
-import glob
 import os
-import sys
-import cv2
+import glob
 
 parser = argparse.ArgumentParser()
-parser.add_argument("directory", type=str)
 parser.add_argument("filename", type=str)
+parser.add_argument("directory", type=str)
 args = parser.parse_args()
 
 with tf.python_io.TFRecordWriter(args.filename) as writer:

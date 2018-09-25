@@ -1,2 +1,6 @@
+*.pyc
+.DS_Store
+.vscode/
 data/
 celeba_dcgan_model/
+celeba_dcgan_model.tar.gz
