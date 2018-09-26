@@ -67,7 +67,7 @@ dcgan_model = dcgan.Model(
         data_format="channels_last"
     ),
     hyper_param=dcgan.Model.HyperParam(
-        latent_dimension=256,
+        latent_dimensions=256,
         gradient_coefficient=5.0
     )
 )

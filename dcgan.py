@@ -30,7 +30,7 @@ class Model(object):
     GeneratorParam = collections.namedtuple("GeneratorParam", ("image_size", "filters",
                                                                "block_params", "conv_param", "data_format"))
     DiscriminatorParam = collections.namedtuple("DiscriminatorParam", ("filters", "conv_param", "block_params", "data_format"))
-    HyperParam = collections.namedtuple("HyperParam", ("latent_dimension", "gradient_coefficient"))
+    HyperParam = collections.namedtuple("HyperParam", ("latent_dimensions", "gradient_coefficient"))
     DatasetParam = collections.namedtuple("DatasetParam", ("filenames", "batch_size", "num_epochs", "buffer_size"))
 
     class Generator(object):
@@ -193,7 +193,7 @@ class Model(object):
             data_format=discriminator_param.data_format
         )
 
-        self.latents = tf.placeholder(dtype=tf.float32, shape=[None, hyper_param.latent_dimension])
+        self.latents = tf.placeholder(dtype=tf.float32, shape=[None, hyper_param.latent_dimensions])
         self.training = tf.placeholder(dtype=tf.bool, shape=[])
         self.gradient_coefficient = tf.constant(value=hyper_param.gradient_coefficient, dtype=tf.float32)
 
@@ -381,6 +381,8 @@ class Model(object):
                                 self.training: True
                             }
                         )
+
+                        print(fakes)
 
                         images = np.concatenate([reals, fakes], axis=2)
 
