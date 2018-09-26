@@ -129,16 +129,6 @@ class Model(object):
 
                 for i, block_param in enumerate(self.block_params):
 
-                    inputs = ops.residual_block(
-                        inputs=inputs,
-                        filters=self.filters << i,
-                        strides=block_param.strides,
-                        normalization=None,
-                        activation=tf.nn.leaky_relu,
-                        data_format=self.data_format,
-                        training=training
-                    )
-
                     for _ in range(1, block_param.blocks):
 
                         inputs = ops.residual_block(
@@ -150,6 +140,16 @@ class Model(object):
                             data_format=self.data_format,
                             training=training
                         )
+
+                    inputs = ops.residual_block(
+                        inputs=inputs,
+                        filters=self.filters << i,
+                        strides=block_param.strides,
+                        normalization=None,
+                        activation=tf.nn.leaky_relu,
+                        data_format=self.data_format,
+                        training=training
+                    )
 
                 inputs = tf.layers.flatten(inputs)
 
