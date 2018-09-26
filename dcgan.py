@@ -24,32 +24,30 @@ class Model(object):
         by Lars Mescheder, Andreas Geiger, and Sebastian Nowozin, Jul 2018.
     """
 
-    ConvParam = collections.namedtuple("ConvParam", ("kernel_size", "strides"))
-    BlockParam = collections.namedtuple("BlockParam", ("blocks", "strides"))
-    GeneratorParam = collections.namedtuple("GeneratorParam", ("image_size", "filters", "block_params", "conv_param", "data_format"))
-    DiscriminatorParam = collections.namedtuple("DiscriminatorParam", ("image_size", "filters", "block_params", "conv_param", "data_format"))
+    BlockParam = collections.namedtuple("BlockParam", ("filters", "blocks"))
+    GeneratorParam = collections.namedtuple("GeneratorParam", ("image_size", "filters", "block_params", "data_format"))
+    DiscriminatorParam = collections.namedtuple("DiscriminatorParam", ("filters", "block_params", "data_format"))
     HyperParam = collections.namedtuple("HyperParam", ("latent_dimensions", "gradient_coefficient"))
     DatasetParam = collections.namedtuple("DatasetParam", ("filenames", "batch_size", "num_epochs", "buffer_size"))
 
     class Generator(object):
 
-        def __init__(self, image_size, filters, block_params, conv_param, data_format):
+        def __init__(self, image_size, filters, block_params, data_format):
 
             self.image_size = image_size
             self.filters = filters
             self.block_params = block_params
-            self.conv_param = conv_param
             self.data_format = data_format
 
         def __call__(self, inputs, training, name="generator", reuse=False):
 
             with tf.variable_scope(name, reuse=reuse):
 
-                image_size = [size >> len(self.block_params) for size in self.image_size]
+                seed_size = (np.array(self.image_size) >> len(self.block_params)).tolist()
 
                 inputs = ops.dense_block(
                     inputs=inputs,
-                    units=self.filters * np.prod(image_size),
+                    units=np.prod(seed_size) * self.filters,
                     normalization=None,
                     activation=tf.nn.leaky_relu,
                     data_format=self.data_format,
@@ -58,30 +56,26 @@ class Model(object):
 
                 inputs = tf.reshape(
                     tensor=inputs,
-                    shape=[-1] + image_size + [self.filters]
+                    shape=[-1] + seed_size + [self.filters]
                 )
 
                 if self.data_format == "channels_first":
 
                     inputs = tf.transpose(inputs, [0, 3, 1, 2])
 
-                for i, block_param in enumerate(self.block_params):
+                for block_param in self.block_params:
 
-                    inputs = ops.residual_transpose_block(
+                    inputs = ops.upsampling2d(
                         inputs=inputs,
-                        filters=self.filters >> i,
-                        strides=block_param.strides,
-                        normalization=None,
-                        activation=tf.nn.leaky_relu,
-                        data_format=self.data_format,
-                        training=training
+                        size=2
+                        data_format=self.data_format
                     )
 
-                    for _ in range(1, block_param.blocks):
+                    for _ in range(block_param.blocks):
 
-                        inputs = ops.residual_transpose_block(
+                        inputs = ops.residual_block(
                             inputs=inputs,
-                            filters=self.filters >> i,
+                            filters=block_param.filters,
                             strides=1,
                             normalization=None,
                             activation=tf.nn.leaky_relu,
@@ -89,13 +83,13 @@ class Model(object):
                             training=training
                         )
 
-                inputs = ops.conv2d_transpose_block(
+                inputs = ops.conv2d_block(
                     inputs=inputs,
                     filters=3,
-                    kernel_size=self.conv_param.kernel_size,
-                    strides=self.conv_param.strides,
+                    kernel_size=3,
+                    strides=1,
                     normalization=None,
-                    activation=tf.nn.tanh,
+                    activation=tf.nn.sigmoid,
                     data_format=self.data_format,
                     training=training
                 )
@@ -104,11 +98,9 @@ class Model(object):
 
     class Discriminator(object):
 
-        def __init__(self, image_size, filters, block_params, conv_param, data_format):
+        def __init__(self, filters, block_params, data_format):
 
-            self.image_size = image_size
             self.filters = filters
-            self.conv_param = conv_param
             self.block_params = block_params
             self.data_format = data_format
 
@@ -119,21 +111,21 @@ class Model(object):
                 inputs = ops.conv2d_block(
                     inputs=inputs,
                     filters=self.filters,
-                    kernel_size=self.conv_param.kernel_size,
-                    strides=self.conv_param.strides,
+                    kernel_size=3,
+                    strides=1,
                     normalization=None,
                     activation=tf.nn.leaky_relu,
                     data_format=self.data_format,
                     training=training
                 )
 
-                for i, block_param in enumerate(self.block_params):
+                for block_param in self.block_params:
 
-                    for _ in range(1, block_param.blocks):
+                    for _ in range(block_param.blocks):
 
                         inputs = ops.residual_block(
                             inputs=inputs,
-                            filters=self.filters << i,
+                            filters=block_param.filters,
                             strides=1,
                             normalization=None,
                             activation=tf.nn.leaky_relu,
@@ -141,14 +133,12 @@ class Model(object):
                             training=training
                         )
 
-                    inputs = ops.residual_block(
+                    inputs = tf.layers.average_pooling2d(
                         inputs=inputs,
-                        filters=self.filters << i,
-                        strides=block_param.strides,
-                        normalization=None,
-                        activation=tf.nn.leaky_relu,
-                        data_format=self.data_format,
-                        training=training
+                        pool_size=2,
+                        strides=2,
+                        padding="same",
+                        data_format=self.data_format
                     )
 
                 inputs = tf.layers.flatten(inputs)
@@ -172,15 +162,12 @@ class Model(object):
             image_size=generator_param.image_size,
             filters=generator_param.filters,
             block_params=generator_param.block_params,
-            conv_param=generator_param.conv_param,
             data_format=generator_param.data_format
         )
 
         self.discriminator = Model.Discriminator(
-            image_size=discriminator_param.image_size,
             filters=discriminator_param.filters,
             block_params=discriminator_param.block_params,
-            conv_param=discriminator_param.conv_param,
             data_format=discriminator_param.data_format
         )
 
@@ -220,20 +207,6 @@ class Model(object):
             multi_class_labels=tf.concat([tf.ones_like(self.real_logits), tf.zeros_like(self.fake_logits)], axis=0),
             logits=tf.concat([self.real_logits, self.fake_logits], axis=0)
         )
-
-        '''
-        self.real = self.reals[:1]
-
-        self.real_logit = self.discriminator(
-            inputs=self.real,
-            training=self.training,
-            name="discriminator",
-            reuse=True
-        )
-
-        self.gradient = tf.gradients(ys=self.real_logit, xs=self.real)[0]
-        self.discriminator_loss += tf.nn.l2_loss(self.gradient) * self.gradient_coefficient
-        '''
 
         self.gradient = tf.gradients(ys=tf.reduce_sum(self.real_logits), xs=self.reals)[0]
         self.gradient_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(self.gradient), reduction_indices=[1, 2, 3]))
@@ -393,8 +366,6 @@ class Model(object):
 
                         images = np.concatenate([reals, fakes], axis=2)
 
-                        images = utils.scale(images, -1, 1, 0, 1)
-
                         for image in images:
 
                             cv2.imshow("image", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
@@ -488,8 +459,6 @@ class Model(object):
                     )
 
                     images = np.concatenate([reals, fakes], axis=2)
-
-                    images = utils.scale(images, -1, 1, 0, 1)
 
                     for image in images:
 

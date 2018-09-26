@@ -5,22 +5,42 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-def instance_normalization(inputs, data_format, training):
+def layer_norm(inputs, data_format, training):
+
+    return tf.contrib.layers.layer_norm(
+        inputs=inputs,
+        center=True,
+        scale=True
+    )
+
+
+def instance_norm(inputs, data_format, training):
 
     return tf.contrib.layers.instance_norm(
         inputs=inputs,
+        center=True,
+        scale=True,
         data_format="NCHW" if data_format == "channels_first" else "NHWC"
     )
 
 
-def batch_normalization(inputs, data_format, training):
+def batch_norm(inputs, data_format, training):
 
-    return tf.layers.batch_normalization(
+    return tf.contrib.layers.batch_norm(
         inputs=inputs,
-        axis=1 if data_format == 'channels_first' else 3,
-        training=training,
-        fused=True
+        center=True,
+        scale=True,
+        is_training=training,
+        data_format="NCHW" if data_format == "channels_first" else "NHWC"
     )
+
+
+def upsampling2d(inputs, size, data_format):
+
+    return tf.keras.layers.UpSampling2D(
+        size=size,
+        data_format=data_format
+    )(inputs)
 
 
 def dense_block(inputs, units, normalization, activation, data_format, training):
@@ -65,7 +85,7 @@ def conv2d_block(inputs, filters, kernel_size, strides, normalization, activatio
     return inputs
 
 
-def conv2d_transpose_block(inputs, filters, kernel_size, strides, normalization, activation, data_format, training):
+def deconv2d_block(inputs, filters, kernel_size, strides, normalization, activation, data_format, training):
 
     inputs = tf.layers.conv2d_transpose(
         inputs=inputs,
@@ -105,7 +125,7 @@ def residual_block(inputs, filters, strides, normalization, activation, data_for
         inputs=inputs,
         filters=filters,
         kernel_size=3,
-        strides=1,
+        strides=strides,
         normalization=normalization,
         activation=activation,
         data_format=data_format,
@@ -113,48 +133,6 @@ def residual_block(inputs, filters, strides, normalization, activation, data_for
     )
 
     inputs = conv2d_block(
-        inputs=inputs,
-        filters=filters,
-        kernel_size=3,
-        strides=strides,
-        normalization=normalization,
-        activation=None,
-        data_format=data_format,
-        training=training
-    )
-
-    inputs += shortcut
-
-    inputs = activation(inputs)
-
-    return inputs
-
-
-def residual_transpose_block(inputs, filters, strides, normalization, activation, data_format, training):
-
-    shortcut = conv2d_transpose_block(
-        inputs=inputs,
-        filters=filters,
-        kernel_size=1,
-        strides=strides,
-        normalization=normalization,
-        activation=None,
-        data_format=data_format,
-        training=training
-    )
-
-    inputs = conv2d_transpose_block(
-        inputs=inputs,
-        filters=filters,
-        kernel_size=3,
-        strides=strides,
-        normalization=normalization,
-        activation=activation,
-        data_format=data_format,
-        training=training
-    )
-
-    inputs = conv2d_transpose_block(
         inputs=inputs,
         filters=filters,
         kernel_size=3,

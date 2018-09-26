@@ -46,7 +46,6 @@ class Dataset(dataset.Dataset):
         image = tf.image.decode_jpeg(image, 3)
         image = tf.image.convert_image_dtype(image, tf.float32)
         image = tf.image.resize_images(image, [256, 256])
-        image = utils.scale(image, 0, 1, -1, 1)
 
         return image
 
@@ -56,15 +55,26 @@ dcgan_model = dcgan.Model(
     generator_param=dcgan.Model.GeneratorParam(
         image_size=[256, 256],
         filters=1024,
-        block_params=[dcgan.Model.BlockParam(blocks=1, strides=2)]*6,
-        conv_param=dcgan.Model.ConvParam(kernel_size=3, strides=1),
+        block_params=[
+            dcgan.Model.BlockParam(filters=1024, blocks=1),
+            dcgan.Model.BlockParam(filters=1024, blocks=1),
+            dcgan.Model.BlockParam(filters=512, blocks=1),
+            dcgan.Model.BlockParam(filters=256, blocks=1),
+            dcgan.Model.BlockParam(filters=128, blocks=1),
+            dcgan.Model.BlockParam(filters=64, blocks=1)
+        ],
         data_format="channels_last",
     ),
     discriminator_param=dcgan.Model.DiscriminatorParam(
-        image_size=[256, 256],
-        filters=32,
-        block_params=[dcgan.Model.BlockParam(blocks=1, strides=2)]*6,
-        conv_param=dcgan.Model.ConvParam(kernel_size=3, strides=1),
+        filters=64,
+        block_params=[
+            dcgan.Model.BlockParam(filters=64, blocks=1),
+            dcgan.Model.BlockParam(filters=128, blocks=1),
+            dcgan.Model.BlockParam(filters=256, blocks=1),
+            dcgan.Model.BlockParam(filters=512, blocks=1),
+            dcgan.Model.BlockParam(filters=1024, blocks=1),
+            dcgan.Model.BlockParam(filters=1024, blocks=1)
+        ],
         data_format="channels_last"
     ),
     hyper_param=dcgan.Model.HyperParam(
