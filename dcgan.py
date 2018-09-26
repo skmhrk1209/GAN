@@ -67,7 +67,7 @@ class Model(object):
 
                     inputs = ops.upsampling2d(
                         inputs=inputs,
-                        size=2
+                        size=2,
                         data_format=self.data_format
                     )
 
