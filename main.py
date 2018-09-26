@@ -46,7 +46,7 @@ class Dataset(dataset.Dataset):
         image = tf.image.decode_jpeg(image, 3)
         image = tf.image.convert_image_dtype(image, tf.float32)
         image = tf.image.resize_images(image, [256, 256])
-        image = utils.scale(image, 0, 1, -1, 1)
+        image = utils.scale(image, 0.0, 1.0, -1.0, 1.0)
 
         return image
 

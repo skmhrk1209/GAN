@@ -386,7 +386,7 @@ class Model(object):
 
                         images = np.concatenate([reals, fakes], axis=2)
 
-                        images = utils.scale(images, -1, 1, 0, 1)
+                        images = utils.scale(images, -1.0, 1.0, 0.0, 1.0)
 
                         for image in images:
 
@@ -474,7 +474,7 @@ class Model(object):
 
                     images = np.concatenate([reals, fakes], axis=2)
 
-                    images = utils.scale(images, -1, 1, 0, 1)
+                    images = utils.scale(images, -1.0, 1.0, 0.0, 1.0)
 
                     for image in images:
 
