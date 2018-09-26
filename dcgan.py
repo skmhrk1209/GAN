@@ -237,7 +237,7 @@ class Model(object):
 
         self.gradient = tf.gradients(ys=tf.reduce_sum(self.real_logits), xs=self.reals)[0]
         self.gradient_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(self.gradient), reduction_indices=[1, 2, 3]))
-        self.discriminator_loss += tf.nn.l2_loss(self.gradient) * self.gradient_coefficient
+        self.discriminator_loss += self.gradient_penalty * self.gradient_coefficient
 
         self.generator_eval_metric_op = tf.metrics.accuracy(
             labels=tf.ones_like(self.fake_logits),
