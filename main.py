@@ -68,7 +68,7 @@ dcgan_model = dcgan.Model(
     ),
     hyper_param=dcgan.Model.HyperParam(
         latent_dimension=256,
-        gradient_coefficient=10.0
+        gradient_coefficient=5.0
     )
 )
 

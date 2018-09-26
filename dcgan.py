@@ -230,7 +230,8 @@ class Model(object):
             logits=tf.concat([self.real_logits, self.fake_logits], axis=0)
         )
 
-        self.gradient_penalty = tf.nn.l2_loss(tf.gradients(ys=self.real_logits, xs=[self.reals])[0])
+        self.gradient = tf.gradients(ys=tf.reduce_sum(self.real_logits), xs=self.reals)[0]
+        self.gradient_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(self.gradient), axis=[1, 2, 3]))
         self.discriminator_loss += self.gradient_penalty * self.gradient_coefficient
 
         self.generator_eval_metric_op = tf.metrics.accuracy(
@@ -239,8 +240,8 @@ class Model(object):
         )
 
         self.discriminator_eval_metric_op = tf.metrics.accuracy(
-            labels=tf.concat([tf.zeros_like(self.fake_logits), tf.ones_like(self.real_logits)], axis=0),
-            predictions=tf.round(tf.concat([self.fake_logits, self.real_logits], axis=0))
+            labels=tf.concat([tf.ones_like(self.real_logits), tf.zeros_like(self.fake_logits)], axis=0),
+            predictions=tf.round(tf.concat([self.real_logits, self.fake_logits], axis=0))
         )
 
         self.generator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator")
@@ -315,11 +316,7 @@ class Model(object):
 
                 for i in itertools.count():
 
-                    latents = np.random.normal(
-                        loc=0.0,
-                        scale=1.0,
-                        size=[dataset_param.batch_size, self.latents.shape[1]]
-                    )
+                    latents = np.random.normal([dataset_param.batch_size, self.latents.shape[1]])
 
                     session.run(
                         [self.generator_train_op],
@@ -418,11 +415,7 @@ class Model(object):
 
                 for i in itertools.count():
 
-                    latents = np.random.normal(
-                        loc=0.0,
-                        scale=1.0,
-                        size=[dataset_param.batch_size, self.latents.shape[1]]
-                    )
+                    latents = np.random.normal([dataset_param.batch_size, self.latents.shape[1]])
 
                     generator_accuracy = session.run(
                         [self.generator_eval_metric_op],
@@ -467,11 +460,7 @@ class Model(object):
 
                 for i in itertools.count():
 
-                    latents = np.random.normal(
-                        loc=0.0,
-                        scale=1.0,
-                        size=[dataset_param.batch_size, self.latents.shape[1]]
-                    )
+                    latents = np.random.normal([dataset_param.batch_size, self.latents.shape[1]])
 
                     reals, fakes = session.run(
                         [self.reals, self.fakes],
