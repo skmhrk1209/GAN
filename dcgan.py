@@ -171,7 +171,10 @@ class Model(object):
             data_format=discriminator_param.data_format
         )
 
-        self.latents = tf.placeholder(dtype=tf.float32, shape=[None, hyper_param.latent_dimensions])
+        self.batch_size = tf.placeholder(dtype=tf.int32, shape=[])
+        self.latent_dimensions = tf.constant(value=hyper_param.latent_dimensions)
+        self.latents = tf.random_normal(shape=[self.batch_size, self.latent_dimensions])
+
         self.training = tf.placeholder(dtype=tf.bool, shape=[])
         self.gradient_coefficient = tf.constant(value=hyper_param.gradient_coefficient, dtype=tf.float32)
 
@@ -198,6 +201,7 @@ class Model(object):
             reuse=True
         )
 
+        '''
         self.generator_loss = tf.losses.sigmoid_cross_entropy(
             multi_class_labels=tf.ones_like(self.fake_logits),
             logits=self.fake_logits
@@ -207,9 +211,23 @@ class Model(object):
             multi_class_labels=tf.concat([tf.ones_like(self.real_logits), tf.zeros_like(self.fake_logits)], axis=0),
             logits=tf.concat([self.real_logits, self.fake_logits], axis=0)
         )
+        '''
 
-        self.gradient = tf.gradients(ys=tf.reduce_sum(self.real_logits), xs=self.reals)[0]
-        self.gradient_penalty = tf.reduce_mean(tf.reduce_sum(tf.square(self.gradient), reduction_indices=[1, 2, 3]))
+        self.generator_loss = -tf.reduce_mean(self.fake_logits)
+        self.discriminator_loss = -tf.reduce_mean(self.real_logits) + tf.reduce_mean(self.fake_logits)
+
+        self.interpolate_coefficients = tf.random_uniform(shape=[self.batch_size], dtype=tf.float32)
+        self.interpolates = self.reals + (self.fakes - self.reals) * tf.reshape(self.interpolate_coefficients, [-1, 1, 1, 1])
+        self.interpolate_logits = self.discriminator(
+            inputs=self.interpolates,
+            training=self.training,
+            name="discriminator",
+            reuse=True
+        )
+
+        self.gradients = tf.gradients(self.interpolate_logits, self.interpolates)[0]
+        self.slopes = tf.sqrt(tf.reduce_sum(tf.square(self.gradients), axis=[1, 2, 3]))
+        self.gradient_penalty = tf.reduce_mean(tf.square(self.slopes - tf.ones_like(self.slopes)))
         self.discriminator_loss += self.gradient_penalty * self.gradient_coefficient
 
         self.generator_eval_metric_op = tf.metrics.accuracy(
@@ -292,38 +310,18 @@ class Model(object):
                     buffer_size=dataset_param.buffer_size
                 )
 
+                feed_dict = {self.batch_size: dataset_param.batch_size, self.training: True}
+
                 for i in itertools.count():
 
-                    latents = np.random.normal(
-                        loc=0.0,
-                        scale=1.0,
-                        size=[dataset_param.batch_size, self.latents.shape[1]]
-                    )
-
-                    session.run(
-                        [self.generator_train_op],
-                        feed_dict={
-                            self.latents: latents,
-                            self.training: True
-                        }
-                    )
-
-                    session.run(
-                        [self.discriminator_train_op],
-                        feed_dict={
-                            self.latents: latents,
-                            self.training: True
-                        }
-                    )
+                    session.run([self.generator_train_op], feed_dict=feed_dict)
+                    session.run([self.discriminator_train_op], feed_dict=feed_dict)
 
                     if i % 100 == 0:
 
                         generator_global_step, generator_loss = session.run(
                             [self.generator_global_step, self.generator_loss],
-                            feed_dict={
-                                self.latents: latents,
-                                self.training: True
-                            }
+                            feed_dict=feed_dict
                         )
 
                         print("global_step: {}, generator_loss: {:.1f}".format(
@@ -333,10 +331,7 @@ class Model(object):
 
                         discriminator_global_step, discriminator_loss = session.run(
                             [self.discriminator_global_step, self.discriminator_loss],
-                            feed_dict={
-                                self.latents: latents,
-                                self.training: True
-                            }
+                            feed_dict=feed_dict
                         )
 
                         print("global_step: {}, discriminator_loss: {:.1f}".format(
@@ -356,13 +351,7 @@ class Model(object):
 
                         start = time.time()
 
-                        reals, fakes = session.run(
-                            [self.reals, self.fakes],
-                            feed_dict={
-                                self.latents: latents,
-                                self.training: True
-                            }
-                        )
+                        reals, fakes = session.run([self.reals, self.fakes], feed_dict=feed_dict)
 
                         images = np.concatenate([reals, fakes], axis=2)
 
@@ -393,31 +382,15 @@ class Model(object):
                     buffer_size=dataset_param.buffer_size
                 )
 
-                for i in itertools.count():
+                feed_dict = {self.batch_size: dataset_param.batch_size, self.training: False}
 
-                    latents = np.random.normal(
-                        loc=0.0,
-                        scale=1.0,
-                        size=[dataset_param.batch_size, self.latents.shape[1]]
-                    )
+                for _ in itertools.count():
 
-                    generator_accuracy = session.run(
-                        [self.generator_eval_metric_op],
-                        feed_dict={
-                            self.latents: latents,
-                            self.training: False
-                        }
-                    )
+                    generator_accuracy = session.run([self.generator_eval_metric_op], feed_dict=feed_dict)
 
                     print("generator_accuracy: {:.1f}".format(generator_accuracy))
 
-                    discriminator_accuracy = session.run(
-                        [self.discriminator_eval_metric_op],
-                        feed_dict={
-                            self.latents: latents,
-                            self.training: False
-                        }
-                    )
+                    discriminator_accuracy = session.run([self.discriminator_eval_metric_op], feed_dict=feed_dict)
 
                     print("discriminator_accuracy: {:.1f}".format(discriminator_accuracy))
 
@@ -442,21 +415,11 @@ class Model(object):
                     buffer_size=dataset_param.buffer_size
                 )
 
-                for i in itertools.count():
+                feed_dict = {self.batch_size: dataset_param.batch_size, self.training: False}
 
-                    latents = np.random.normal(
-                        loc=0.0,
-                        scale=1.0,
-                        size=[dataset_param.batch_size, self.latents.shape[1]]
-                    )
+                for _ in itertools.count():
 
-                    reals, fakes = session.run(
-                        [self.reals, self.fakes],
-                        feed_dict={
-                            self.latents: latents,
-                            self.training: False
-                        }
-                    )
+                    reals, fakes = session.run([self.reals, self.fakes], feed_dict=feed_dict)
 
                     images = np.concatenate([reals, fakes], axis=2)
 

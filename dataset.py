@@ -8,12 +8,6 @@ import collections
 
 class Dataset(object):
 
-    ''' データセットパイプラインの抽象クラス
-
-        構造はパラメータ化できない
-        具体的な構造はparseをオーバーライドすることで決定
-    '''
-
     def __init__(self):
 
         self.filenames = tf.placeholder(dtype=tf.string, shape=[None])
@@ -31,7 +25,7 @@ class Dataset(object):
 
     def parse(self, example):
 
-        pass  # OVERRIDE!!
+        pass
 
     def initialize(self, filenames, batch_size, num_epochs, buffer_size):
 
