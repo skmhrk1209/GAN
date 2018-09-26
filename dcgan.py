@@ -336,7 +336,11 @@ class Model(object):
 
                 for i in itertools.count():
 
-                    latents = np.random.normal(size=[dataset_param.batch_size, self.latents.shape[1]])
+                    latents = np.random.normal(
+                        loc=0.0,
+                        scale=1.0,
+                        size=[dataset_param.batch_size, self.latents.shape[1]]
+                    )
 
                     session.run(
                         [self.generator_train_op],
@@ -394,6 +398,24 @@ class Model(object):
 
                         start = time.time()
 
+                        reals, fakes = session.run(
+                            [self.reals, self.fakes],
+                            feed_dict={
+                                self.latents: latents,
+                                self.training: True
+                            }
+                        )
+
+                        images = np.concatenate([reals, fakes], axis=2)
+
+                        images = utils.scale(images, -1, 1, 0, 1)
+
+                        for image in images:
+
+                            cv2.imshow("image", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
+                            cv2.waitKey(1000)
+
             except tf.errors.OutOfRangeError:
 
                 print("training ended")
@@ -417,7 +439,11 @@ class Model(object):
 
                 for i in itertools.count():
 
-                    latents = np.random.normal(size=[dataset_param.batch_size, self.latents.shape[1]])
+                    latents = np.random.normal(
+                        loc=0.0,
+                        scale=1.0,
+                        size=[dataset_param.batch_size, self.latents.shape[1]]
+                    )
 
                     generator_accuracy = session.run(
                         [self.generator_eval_metric_op],
@@ -462,7 +488,11 @@ class Model(object):
 
                 for i in itertools.count():
 
-                    latents = np.random.normal(size=[dataset_param.batch_size, self.latents.shape[1]])
+                    latents = np.random.normal(
+                        loc=0.0,
+                        scale=1.0,
+                        size=[dataset_param.batch_size, self.latents.shape[1]]
+                    )
 
                     reals, fakes = session.run(
                         [self.reals, self.fakes],
