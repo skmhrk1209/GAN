@@ -54,16 +54,32 @@ class Dataset(dataset.Dataset):
 dcgan_model = dcgan.Model(
     Dataset=Dataset,
     generator_param=dcgan.Model.GeneratorParam(
-        image_size=[4, 4],
+        image_size=[256, 256],
         filters=1024,
-        block_params=[dcgan.Model.BlockParam(blocks=1, strides=1)] * 6,
-        conv_param=dcgan.Model.ConvParam(kernel_size=3, strides=1),
+        block_params=[
+            dcgan.Model.BlockParam(filters=1024, blocks=1),
+            dcgan.Model.BlockParam(filters=1024, blocks=1),
+            dcgan.Model.BlockParam(filters=512, blocks=1),
+            dcgan.Model.BlockParam(filters=256, blocks=1),
+            dcgan.Model.BlockParam(filters=128, blocks=1),
+            dcgan.Model.BlockParam(filters=64, blocks=1),
+            dcgan.Model.BlockParam(filters=64, blocks=1)
+        ],
+        conv_param=dcgan.Model.ConvParam(kernel_size=3),
         data_format="channels_last",
     ),
     discriminator_param=dcgan.Model.DiscriminatorParam(
-        filters=32,
-        conv_param=dcgan.Model.ConvParam(kernel_size=3, strides=1),
-        block_params=[dcgan.Model.BlockParam(blocks=1, strides=1)] * 6,
+        filters=64,
+        conv_param=dcgan.Model.ConvParam(kernel_size=3),
+        block_params=[
+            dcgan.Model.BlockParam(filters=64, blocks=1),
+            dcgan.Model.BlockParam(filters=64, blocks=1),
+            dcgan.Model.BlockParam(filters=128, blocks=1),
+            dcgan.Model.BlockParam(filters=256, blocks=1),
+            dcgan.Model.BlockParam(filters=512, blocks=1),
+            dcgan.Model.BlockParam(filters=1024, blocks=1),
+            dcgan.Model.BlockParam(filters=1024, blocks=1)
+        ],
         data_format="channels_last"
     ),
     hyper_param=dcgan.Model.HyperParam(
