@@ -316,7 +316,7 @@ class Model(object):
 
                 for i in itertools.count():
 
-                    latents = np.random.normal([dataset_param.batch_size, self.latents.shape[1]])
+                    latents = np.random.normal(size=[dataset_param.batch_size, self.latents.shape[1]])
 
                     session.run(
                         [self.generator_train_op],
@@ -415,7 +415,7 @@ class Model(object):
 
                 for i in itertools.count():
 
-                    latents = np.random.normal([dataset_param.batch_size, self.latents.shape[1]])
+                    latents = np.random.normal(size=[dataset_param.batch_size, self.latents.shape[1]])
 
                     generator_accuracy = session.run(
                         [self.generator_eval_metric_op],
@@ -460,7 +460,7 @@ class Model(object):
 
                 for i in itertools.count():
 
-                    latents = np.random.normal([dataset_param.batch_size, self.latents.shape[1]])
+                    latents = np.random.normal(size=[dataset_param.batch_size, self.latents.shape[1]])
 
                     reals, fakes = session.run(
                         [self.reals, self.fakes],
