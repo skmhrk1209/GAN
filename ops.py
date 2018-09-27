@@ -208,6 +208,30 @@ def residual_block(inputs, filters, strides, normalization, activation, data_for
         return inputs
 
 
+def unpool(value, name="unpool"):
+    ''' Unpooling operation.
+
+        (https://github.com/tensorflow/tensorflow/issues/2169)
+        N-dimensional version of the unpooling operation from
+        https://www.robots.ox.ac.uk/~vgg/rg/papers/Dosovitskiy_Learning_to_Generate_2015_CVPR_paper.pdf
+        Taken from: https://github.com/tensorflow/tensorflow/issues/2169
+        Args:
+        value: a Tensor of shape [b, d0, d1, ..., dn, ch]
+        name: name of the op
+        Returns:
+        A Tensor of shape [b, 2*d0, 2*d1, ..., 2*dn, ch]
+    '''
+    with tf.name_scope(name) as scope:
+        sh = value.get_shape().as_list()
+        dim = len(sh[1:-1])
+        out = (tf.reshape(value, [-1] + sh[-dim:]))
+        for i in range(dim, 0, -1):
+            out = tf.concat([out, tf.zeros_like(out)], i)
+        out_size = [-1] + [s * 2 for s in sh[1:-1]] + [sh[-1]]
+        out = tf.reshape(out, out_size, name=scope)
+    return out
+
+
 def unpooling2d(inputs, pool_size, data_format):
     ''' upsampling operation with zero padding
 
@@ -222,39 +246,39 @@ def unpooling2d(inputs, pool_size, data_format):
 
         inputs = tf.transpose(inputs, [0, 3, 1, 2])
 
-    map_size = inputs.get_shape().as_list()[2:]
+    shape = inputs.get_shape().as_list()
 
-    pool_size = np.asarray(pool_size)
-    map_size = np.asarray(map_size)
+    inputs = tf.reshape(
+        tensor=inputs,
+        shape=[-1, shape[1], shape[2] * shape[3], 1]
+    )
 
-    inputs = tf.map_fn(
-        fn=lambda feature_maps: tf.map_fn(
-            fn=lambda feature_map: tf.reshape(
-                tensor=tf.map_fn(
-                    fn=lambda row: tf.pad(
-                        tensor=tf.reshape(
-                            tensor=tf.pad(
-                                tensor=tf.reshape(
-                                    tensor=row,
-                                    shape=[-1, 1]
-                                ),
-                                paddings=[[0, 0], [0, pool_size[1] - 1]],
-                                mode="CONSTANT",
-                                constant_values=0
-                            ),
-                            shape=[1, -1]
-                        ),
-                        paddings=[[0, pool_size[0] - 1], [0, 0]],
-                        mode="CONSTANT",
-                        constant_values=0
-                    ),
-                    elems=feature_map
-                ),
-                shape=map_size * pool_size
-            ),
-            elems=feature_maps
-        ),
-        elems=inputs
+    paddings = [[0, 0], [0, 0], [0, 0], [0, pool_size[1] - 1]]
+
+    inputs = tf.pad(
+        tensor=inputs,
+        paddings=paddings,
+        mode="CONSTANT",
+        constant_values=0
+    )
+
+    inputs = tf.reshape(
+        tensor=inputs,
+        shape=[-1, shape[1], shape[2], shape[3] * pool_size[1]]
+    )
+
+    paddings = [[0, 0], [0, 0], [0, 0], [0, shape[3] * pool_size[1] * (pool_size[0] - 1)]]
+
+    inputs = tf.pad(
+        tensor=inputs,
+        paddings=paddings,
+        mode="CONSTANT",
+        constant_values=0
+    )
+
+    inputs = tf.reshape(
+        tensor=inputs,
+        shape=[-1, shape[1], shape[2] * pool_size[0], shape[3] * pool_size[1]]
     )
 
     if data_format == "channels_last":
