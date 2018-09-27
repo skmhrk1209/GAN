@@ -297,7 +297,7 @@ def batch_norm(inputs, data_format, training):
 
     return tf.layers.batch_normalization(
         inputs=inputs,
-        axis=1 if data_format == "channels_first" else 3
+        axis=1 if data_format == "channels_first" else 3,
         center=True,
         scale=True,
         training=training,
