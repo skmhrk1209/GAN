@@ -3,5 +3,5 @@
 .vscode/
 __pycache__/
 data/
-celeba_dcgan_model/
-celeba_dcgan_model.tar.gz
+celeba_gan_gp_model/
+celeba_gan_gp_model.tar.gz
