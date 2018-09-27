@@ -29,7 +29,7 @@ class Model(abc.ABC):
 
         self.reals = self.dataset.input()
         self.fakes = self.generator(inputs=self.latents, training=self.training, reuse=False)
-        
+
         self.real_logits = self.discriminator(inputs=self.reals, training=self.training, reuse=False)
         self.fake_logits = self.discriminator(inputs=self.fakes, training=self.training, reuse=True)
 
@@ -184,13 +184,13 @@ class Model(abc.ABC):
                 print("evaluation started")
 
                 self.dataset.initialize(
-                    filenames=dataset_param.filenames,
-                    batch_size=dataset_param.batch_size,
-                    num_epochs=dataset_param.num_epochs,
-                    buffer_size=dataset_param.buffer_size
+                    filenames=filenames,
+                    batch_size=batch_size,
+                    num_epochs=num_epochs,
+                    buffer_size=buffer_size
                 )
 
-                feed_dict = {self.batch_size: dataset_param.batch_size, self.training: False}
+                feed_dict = {self.batch_size: batch_size, self.training: False}
 
                 for _ in itertools.count():
 
@@ -206,7 +206,7 @@ class Model(abc.ABC):
 
                 print("evaluation ended")
 
-    def predict(self, model_dir, dataset_param, config):
+    def predict(self, model_dir, filenames, batch_size, num_epochs, buffer_size, config):
 
         with tf.Session(config=config) as session:
 
@@ -217,13 +217,13 @@ class Model(abc.ABC):
                 print("prediction started")
 
                 self.dataset.initialize(
-                    filenames=dataset_param.filenames,
-                    batch_size=dataset_param.batch_size,
-                    num_epochs=dataset_param.num_epochs,
-                    buffer_size=dataset_param.buffer_size
+                    filenames=filenames,
+                    batch_size=batch_size,
+                    num_epochs=num_epochs,
+                    buffer_size=buffer_size
                 )
 
-                feed_dict = {self.batch_size: dataset_param.batch_size, self.training: False}
+                feed_dict = {self.batch_size: batch_size, self.training: False}
 
                 for _ in itertools.count():
 
