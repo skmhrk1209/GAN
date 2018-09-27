@@ -295,11 +295,11 @@ def instance_norm(inputs, data_format, training):
 
 def batch_norm(inputs, data_format, training):
 
-    return tf.layers.batch_normalization(
+    return tf.contrib.layers.batch_norm(
         inputs=inputs,
-        axis=1 if data_format == "channels_first" else 3,
         center=True,
         scale=True,
-        training=training,
-        trainable=True
+        is_training=training,
+        trainable=True,
+        data_format="NCHW" if data_format == "channels_first" else "NHWC"
     )
