@@ -54,14 +54,14 @@ class Generator(object):
                         inputs=inputs,
                         filters=residual_param.filters,
                         strides=[1, 1],
-                        normalization=ops.batch_norm,
+                        normalization=ops.batch_normalization,
                         activation=tf.nn.relu,
                         data_format=self.data_format,
                         training=training,
                         name="residual_block_{}_{}".format(i, j)
                     )
 
-            inputs = ops.batch_norm(
+            inputs = ops.batch_normalization(
                 inputs=inputs,
                 data_format=self.data_format,
                 training=training
@@ -104,7 +104,7 @@ class Discriminator(object):
                 strides=[1, 1],
                 data_format=self.data_format,
                 name="conv2d_0",
-                use_spectral_norm=True
+                apply_spectral_normalization=True
             )
 
             for i, residual_param in enumerate(self.residual_params):
@@ -120,7 +120,7 @@ class Discriminator(object):
                         data_format=self.data_format,
                         training=training,
                         name="residual_block_{}_{}".format(i, j),
-                        use_spectral_norm=True
+                        apply_spectral_normalization=True
                     )
 
                 inputs = tf.layers.average_pooling2d(
@@ -142,7 +142,7 @@ class Discriminator(object):
                 inputs=inputs,
                 units=1,
                 name="dense_0",
-                use_spectral_norm=True
+                apply_spectral_normalization=True
             )
 
             return inputs

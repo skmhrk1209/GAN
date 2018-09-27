@@ -30,7 +30,7 @@ class Dataset(dataset.Dataset):
 
         self.data_format = data_format
 
-        super().__init__()
+        super(Dataset, self).__init__()
 
     def parse(self, example):
 

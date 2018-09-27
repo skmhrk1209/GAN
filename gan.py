@@ -68,16 +68,6 @@ class Model(object):
         self.gradient_penalty = tf.reduce_mean(tf.square(slopes - 1.0))
         self.discriminator_loss += self.gradient_penalty * self.gradient_coefficient
 
-        self.generator_eval_metric_op = tf.metrics.accuracy(
-            labels=tf.ones_like(self.fake_logits),
-            predictions=tf.round(self.fake_logits)
-        )
-
-        self.discriminator_eval_metric_op = tf.metrics.accuracy(
-            labels=tf.concat([tf.ones_like(self.real_logits), tf.zeros_like(self.fake_logits)], axis=0),
-            predictions=tf.round(tf.concat([self.real_logits, self.fake_logits], axis=0))
-        )
-
         self.generator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator")
         self.discriminator_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator")
 
@@ -200,39 +190,6 @@ class Model(object):
             except tf.errors.OutOfRangeError:
 
                 print("training ended")
-
-    def evaluate(self, model_dir, filenames, batch_size, num_epochs, buffer_size, config):
-
-        with tf.Session(config=config) as session:
-
-            self.initialize(model_dir)
-
-            try:
-
-                print("evaluation started")
-
-                self.dataset.initialize(
-                    filenames=filenames,
-                    batch_size=batch_size,
-                    num_epochs=num_epochs,
-                    buffer_size=buffer_size
-                )
-
-                feed_dict = {self.batch_size: batch_size, self.training: False}
-
-                for _ in itertools.count():
-
-                    generator_accuracy = session.run([self.generator_eval_metric_op], feed_dict=feed_dict)
-
-                    print("generator_accuracy: {:.2f}".format(generator_accuracy))
-
-                    discriminator_accuracy = session.run([self.discriminator_eval_metric_op], feed_dict=feed_dict)
-
-                    print("discriminator_accuracy: {:.2f}".format(discriminator_accuracy))
-
-            except tf.errors.OutOfRangeError:
-
-                print("evaluation ended")
 
     def predict(self, model_dir, filenames, batch_size, num_epochs, buffer_size, config):
 
