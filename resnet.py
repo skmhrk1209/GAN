@@ -104,7 +104,7 @@ class Discriminator(object):
                 strides=[1, 1],
                 data_format=self.data_format,
                 name="conv2d_0",
-                use_spectral_norm=True
+                use_spectral_norm=False
             )
 
             for i, residual_param in enumerate(self.residual_params):
@@ -120,7 +120,7 @@ class Discriminator(object):
                         data_format=self.data_format,
                         training=training,
                         name="residual_block_{}_{}".format(i, j),
-                        use_spectral_norm=True
+                        use_spectral_norm=False
                     )
 
                 inputs = tf.layers.average_pooling2d(
@@ -142,7 +142,7 @@ class Discriminator(object):
                 inputs=inputs,
                 units=1,
                 name="dense_0",
-                use_spectral_norm=True
+                use_spectral_norm=False
             )
 
             inputs = tf.nn.sigmoid(inputs)
