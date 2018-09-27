@@ -84,7 +84,7 @@ wgan_gp_model = wgan_gp.Model(
             resnet.Generator.ResidualParam(filters=512, blocks=1),
             resnet.Generator.ResidualParam(filters=1024, blocks=1),
             resnet.Generator.ResidualParam(filters=1024, blocks=1)
-        ]
+        ],
         data_format=args.data_format
     ),
     hyper_param=wgan_gp.Model.HyperParam(

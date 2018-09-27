@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import collections
 import gan
 
 
@@ -31,7 +32,7 @@ class Model(gan.Model):
     def discriminator_loss(self):
 
         loss = -tf.reduce_mean(self.real_logits) + tf.reduce_mean(self.fake_logits)
-        loss += self.gradient_penalty() *
+        loss += self.gradient_penalty() * self.gradient_coefficient
 
         return loss
 

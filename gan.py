@@ -3,13 +3,13 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-import abc
+from abc import *
 import os
 import time
 import cv2
 
 
-class Model(metaclass=abc.ABCMeta):
+class Model(metaclass=ABCMeta):
 
     HyperParam = collections.namedtuple("HyperParam", ("latent_size"))
 
