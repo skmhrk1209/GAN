@@ -7,7 +7,9 @@ import numpy as np
 
 
 def spectral_norm(input):
-    """Performs Spectral Normalization on a weight tensor."""
+    ''' Spectral Normalization
+        (https://github.com/google/compare_gan/blob/master/compare_gan/src/gans/ops.py)
+    '''
 
     if len(input.shape) < 2:
         raise ValueError("Spectral norm can only be applied to multi-dimensional tensors")
