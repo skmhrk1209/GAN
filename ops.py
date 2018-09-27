@@ -42,8 +42,8 @@ def spectral_norm(input):
     power_iteration_rounds = 1
     for _ in range(power_iteration_rounds):
         # `v` approximates the first right singular vector of matrix `w`.
-        v = tf.nn.l2_normalize(tf.matmul(tf.transpose(w), u), axis=None, epsilon=1e-12)
-        u = tf.nn.l2_normalize(tf.matmul(w, v), axis=None, epsilon=1e-12)
+        v = tf.nn.l2_normalize(tf.matmul(tf.transpose(w), u), dim=None, epsilon=1e-12)
+        u = tf.nn.l2_normalize(tf.matmul(w, v), dim=None, epsilon=1e-12)
 
     # Update persisted approximation.
     with tf.control_dependencies([tf.assign(u_var, u, name="update_u")]):
