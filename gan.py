@@ -13,7 +13,15 @@ import cv2
 
 class Model(object):
 
-    HyperParam = collections.namedtuple("HyperParam", ("latent_size", "gradient_coefficient"))
+    HyperParam = collections.namedtuple(
+        "HyperParam", (
+            "latent_size",
+            "gradient_coefficient",
+            "learning_rate",
+            "beta1",
+            "beta2"
+        )
+    )
 
     def __init__(self, dataset, generator, discriminator, hyper_param):
 
@@ -21,11 +29,17 @@ class Model(object):
         self.generator = generator
         self.discriminator = discriminator
 
-        self.training = tf.placeholder(dtype=tf.bool, shape=[])
         self.batch_size = tf.placeholder(dtype=tf.int32, shape=[])
         self.latent_size = tf.constant(value=hyper_param.latent_size, dtype=tf.int32)
         self.latents = tf.random_normal(shape=[self.batch_size, self.latent_size])
+
         self.gradient_coefficient = tf.constant(value=hyper_param.gradient_coefficient, dtype=tf.float32)
+
+        self.learning_rate = tf.constant(value=hyper_param.learning_rate, dtype=tf.float32)
+        self.beta1 = tf.constant(value=hyper_param.beta1, dtype=tf.float32)
+        self.beta2 = tf.constant(value=hyper_param.beta2, dtype=tf.float32)
+
+        self.training = tf.placeholder(dtype=tf.bool, shape=[])
 
         self.reals = self.dataset.input()
         self.fakes = self.generator(inputs=self.latents, training=self.training, reuse=False)
@@ -70,8 +84,12 @@ class Model(object):
         self.generator_global_step = tf.Variable(initial_value=0, trainable=False)
         self.discriminator_global_step = tf.Variable(initial_value=0, trainable=False)
 
-        self.generator_optimizer = tf.train.AdamOptimizer()
-        self.discriminator_optimizer = tf.train.AdamOptimizer()
+        self.generator_optimizer = tf.train.AdamOptimizer(
+            learning_rate=self.learning_rate, beta1=self.beta1, beta2=self.beta2
+        )
+        self.discriminator_optimizer = tf.train.AdamOptimizer(
+            learning_rate=self.learning_rate, beta1=self.beta1, beta2=self.beta2
+        )
 
         self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
