@@ -11,7 +11,7 @@ import utils
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, default="celeba_gan_model", help="model directory")
-parser.add_argument("--batch_size", type=int, default=64, help="batch size")
+parser.add_argument("--batch_size", type=int, default=50, help="batch size")
 parser.add_argument("--num_epochs", type=int, default=10, help="number of training epochs")
 parser.add_argument("--buffer_size", type=int, default=100000, help="buffer size to shuffle dataset")
 parser.add_argument('--data_format', type=str, choices=["channels_first", "channels_last"], default="channels_last", help="data_format")
