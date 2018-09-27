@@ -195,7 +195,7 @@ class Model(object):
 
                             cv2.imshow("image", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
-                            cv2.waitKey(1000)
+                            cv2.waitKey(100)
 
             except tf.errors.OutOfRangeError:
 
