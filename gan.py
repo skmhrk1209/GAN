@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 import numpy as np
-from abc import *
+import abc
 import collections
 import os
 import itertools
@@ -12,7 +12,7 @@ import time
 import cv2
 
 
-class Model(metaclass=ABCMeta):
+class Model(abc.ABC):
 
     HyperParam = collections.namedtuple("HyperParam", ("latent_size"))
 
@@ -88,14 +88,12 @@ class Model(metaclass=ABCMeta):
                 global_step=self.discriminator_global_step
             )
 
-    @abstractmethod
+    @abc.abstractmethod
     def generator_loss(self):
-
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def discriminator_loss(self):
-
         pass
 
     def initialize(self, model_dir):
