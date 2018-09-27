@@ -53,7 +53,7 @@ class Dataset(dataset.Dataset):
         image = tf.read_file(features["path"])
         image = tf.image.decode_jpeg(image, 3)
         image = tf.image.convert_image_dtype(image, tf.float32)
-        image = tf.image.resize_images(image, [256, 256])
+        image = tf.image.resize_image_with_crop_or_pad(image, 128, 128)
 
         if self.data_format == "channels_first":
 
@@ -65,12 +65,11 @@ class Dataset(dataset.Dataset):
 wgan_gp_model = wgan_gp.Model(
     dataset=Dataset(args.data_format),
     generator=resnet.Generator(
-        image_size=[256, 256],
-        filters=1024,
+        image_size=[128, 128],
+        filters=512,
         residual_params=[
-            resnet.Generator.ResidualParam(filters=1024, blocks=1),
-            resnet.Generator.ResidualParam(filters=1024, blocks=1),
             resnet.Generator.ResidualParam(filters=512, blocks=1),
+            resnet.Generator.ResidualParam(filters=256, blocks=1),
             resnet.Generator.ResidualParam(filters=256, blocks=1),
             resnet.Generator.ResidualParam(filters=128, blocks=1),
             resnet.Generator.ResidualParam(filters=64, blocks=1)
@@ -83,14 +82,14 @@ wgan_gp_model = wgan_gp.Model(
             resnet.Generator.ResidualParam(filters=64, blocks=1),
             resnet.Generator.ResidualParam(filters=128, blocks=1),
             resnet.Generator.ResidualParam(filters=256, blocks=1),
+            resnet.Generator.ResidualParam(filters=256, blocks=1),
             resnet.Generator.ResidualParam(filters=512, blocks=1),
-            resnet.Generator.ResidualParam(filters=1024, blocks=1),
-            resnet.Generator.ResidualParam(filters=1024, blocks=1)
+            resnet.Generator.ResidualParam(filters=512, blocks=1)
         ],
         data_format=args.data_format
     ),
     hyper_param=wgan_gp.Model.HyperParam(
-        latent_size=256,
+        latent_size=128,
         gradient_coefficient=10.0
     )
 )
