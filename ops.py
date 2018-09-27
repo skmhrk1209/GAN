@@ -299,6 +299,7 @@ def batch_norm(inputs, data_format, training):
         inputs=inputs,
         center=True,
         scale=True,
+        updates_collections=None,
         is_training=training,
         trainable=True,
         data_format="NCHW" if data_format == "channels_first" else "NHWC"
