@@ -6,6 +6,7 @@ import tensorflow as tf
 from abc import *
 import collections
 import os
+import itertools
 import time
 import cv2
 
