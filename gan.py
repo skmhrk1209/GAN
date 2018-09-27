@@ -28,27 +28,10 @@ class Model(abc.ABC):
         self.latents = tf.random_normal(shape=[self.batch_size, self.latent_size])
 
         self.reals = self.dataset.input()
-
-        self.fakes = self.generator(
-            inputs=self.latents,
-            training=self.training,
-            name="generator",
-            reuse=False
-        )
-
-        self.real_logits = self.discriminator(
-            inputs=self.reals,
-            training=self.training,
-            name="discriminator",
-            reuse=False
-        )
-
-        self.fake_logits = self.discriminator(
-            inputs=self.fakes,
-            training=self.training,
-            name="discriminator",
-            reuse=True
-        )
+        self.fakes = self.generator(inputs=self.latents, training=self.training, reuse=False)
+        
+        self.real_logits = self.discriminator(inputs=self.reals, training=self.training, reuse=False)
+        self.fake_logits = self.discriminator(inputs=self.fakes, training=self.training, reuse=True)
 
         self.generator_loss = self.generator_loss()
         self.discriminator_loss = self.discriminator_loss()

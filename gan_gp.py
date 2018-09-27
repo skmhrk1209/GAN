@@ -19,13 +19,20 @@ class Model(gan.Model):
 
     def generator_loss(self):
 
-        loss = -tf.reduce_mean(self.fake_logits)
+        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=self.fake_logits, labels=tf.ones_like(self.fake_logits)
+        ))
 
         return loss
 
     def discriminator_loss(self):
 
-        loss = -tf.reduce_mean(self.real_logits) + tf.reduce_mean(self.fake_logits)
+        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=self.real_logits, labels=tf.ones_like(self.real_logits)
+        ))
+        loss += tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=self.fake_logits, labels=tf.zeros_like(self.fake_logits)
+        ))
         loss += self.gradient_penalty() * self.gradient_coefficient
 
         return loss
@@ -34,12 +41,7 @@ class Model(gan.Model):
 
         interpolate_coefficients = tf.random_uniform(shape=[self.batch_size, 1, 1, 1], dtype=tf.float32)
         interpolates = self.reals + (self.fakes - self.reals) * interpolate_coefficients
-        interpolate_logits = self.discriminator(
-            inputs=interpolates,
-            name="discriminator",
-            training=self.training,
-            reuse=True
-        )
+        interpolate_logits = self.discriminator(inputs=interpolates, training=self.training, reuse=True)
 
         gradients = tf.gradients(ys=interpolate_logits, xs=interpolates)[0]
         slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), axis=[1, 2, 3]) + 0.0001)
