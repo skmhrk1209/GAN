@@ -115,8 +115,6 @@ class Model(metaclass=ABCMeta):
 
         return saver
 
-    def initialize_dataset(self, filenames, batch_size, num_epochs, buffer_size):
-
     def train(self, model_dir, filenames, batch_size, num_epochs, buffer_size, config):
 
         with tf.Session(config=config) as session:
