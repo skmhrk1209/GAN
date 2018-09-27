@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from abc import *
+import collections
 import os
 import time
 import cv2
