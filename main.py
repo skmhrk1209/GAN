@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 import argparse
-import dcgan
+import wgan_gp
 import dataset
 import utils
 
@@ -50,34 +50,34 @@ class Dataset(dataset.Dataset):
         return image
 
 
-dcgan_model = dcgan.Model(
+wgan_gp_model = wgan_gp.Model(
     Dataset=Dataset,
-    generator_param=dcgan.Model.GeneratorParam(
+    generator_param=wgan_gp.Model.GeneratorParam(
         image_size=[256, 256],
         filters=1024,
         block_params=[
-            dcgan.Model.BlockParam(filters=1024, blocks=1),
-            dcgan.Model.BlockParam(filters=1024, blocks=1),
-            dcgan.Model.BlockParam(filters=512, blocks=1),
-            dcgan.Model.BlockParam(filters=256, blocks=1),
-            dcgan.Model.BlockParam(filters=128, blocks=1),
-            dcgan.Model.BlockParam(filters=64, blocks=1)
+            wgan_gp.Model.BlockParam(filters=1024, blocks=1),
+            wgan_gp.Model.BlockParam(filters=1024, blocks=1),
+            wgan_gp.Model.BlockParam(filters=512, blocks=1),
+            wgan_gp.Model.BlockParam(filters=256, blocks=1),
+            wgan_gp.Model.BlockParam(filters=128, blocks=1),
+            wgan_gp.Model.BlockParam(filters=64, blocks=1)
         ],
         data_format="channels_last",
     ),
-    discriminator_param=dcgan.Model.DiscriminatorParam(
+    discriminator_param=wgan_gp.Model.DiscriminatorParam(
         filters=64,
         block_params=[
-            dcgan.Model.BlockParam(filters=64, blocks=1),
-            dcgan.Model.BlockParam(filters=128, blocks=1),
-            dcgan.Model.BlockParam(filters=256, blocks=1),
-            dcgan.Model.BlockParam(filters=512, blocks=1),
-            dcgan.Model.BlockParam(filters=1024, blocks=1),
-            dcgan.Model.BlockParam(filters=1024, blocks=1)
+            wgan_gp.Model.BlockParam(filters=64, blocks=1),
+            wgan_gp.Model.BlockParam(filters=128, blocks=1),
+            wgan_gp.Model.BlockParam(filters=256, blocks=1),
+            wgan_gp.Model.BlockParam(filters=512, blocks=1),
+            wgan_gp.Model.BlockParam(filters=1024, blocks=1),
+            wgan_gp.Model.BlockParam(filters=1024, blocks=1)
         ],
         data_format="channels_last"
     ),
-    hyper_param=dcgan.Model.HyperParam(
+    hyper_param=wgan_gp.Model.HyperParam(
         latent_dimensions=256,
         gradient_coefficient=10.0
     )
@@ -85,9 +85,9 @@ dcgan_model = dcgan.Model(
 
 if args.train:
 
-    dcgan_model.train(
+    wgan_gp_model.train(
         model_dir=args.model_dir,
-        dataset_param=dcgan.Model.DatasetParam(
+        dataset_param=wgan_gp.Model.DatasetParam(
             filenames=["data/train.tfrecord"],
             batch_size=args.batch_size,
             num_epochs=args.num_epochs,
@@ -105,9 +105,9 @@ if args.train:
 
 if args.predict:
 
-    dcgan_model.evaluate(
+    wgan_gp_model.evaluate(
         model_dir=args.model_dir,
-        dataset_param=dcgan.Model.DatasetParam(
+        dataset_param=wgan_gp.Model.DatasetParam(
             filenames=["data/test.tfrecord"],
             batch_size=args.batch_size,
             num_epochs=args.num_epochs,
@@ -125,9 +125,9 @@ if args.predict:
 
 if args.predict:
 
-    dcgan_model.predict(
+    wgan_gp_model.predict(
         model_dir=args.model_dir,
-        dataset_param=dcgan.Model.DatasetParam(
+        dataset_param=wgan_gp.Model.DatasetParam(
             filenames=["data/test.tfrecord"],
             batch_size=args.batch_size,
             num_epochs=args.num_epochs,

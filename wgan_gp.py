@@ -15,13 +15,10 @@ import cv2
 
 class Model(object):
 
-    """ implementation of DCGAN in TensorFlow
+    """ implementation of WGAN-GP in TensorFlow
 
-    [1] [Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks]
-        (https://arxiv.org/pdf/1511.06434.pdf) by Alec Radford, Luke Metz, and Soumith Chintala, Nov 2015.
-
-    [2] [Which Training Methods for GANs do actually Converge?](https://arxiv.org/pdf/1801.04406.pdf)
-        by Lars Mescheder, Andreas Geiger, and Sebastian Nowozin, Jul 2018.
+    [1] [Improved Training of Wasserstein GANs] (https://arxiv.org/pdf/1511.06434.pdf) 
+        by Ishaan Gulrajani, Faruk Ahmed, Martin Arjovsky, Vincent Dumoulin, and Aaron Courville, Dec 2017.
     """
 
     BlockParam = collections.namedtuple("BlockParam", ("filters", "blocks"))
