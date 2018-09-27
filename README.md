@@ -1,3 +1,3 @@
-# Wasserstein GAN with Gradient Penalty
+# GAN with Spectral Normalization and Gradient Penalty
 
-### TensorFlow implementation of ["Improved Training of Wasserstein GANs"](https://arxiv.org/pdf/1704.00028.pdf)
+### TensorFlow implementation of ["The GAN Landscape: Losses, Architectures, Regularization, and Normalization"](https://arxiv.org/pdf/1807.04720.pdf)
