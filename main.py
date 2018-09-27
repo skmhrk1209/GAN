@@ -5,6 +5,7 @@ from __future__ import print_function
 import tensorflow as tf
 import argparse
 import wgan_gp
+import resnet
 import dataset
 import utils
 
@@ -13,6 +14,7 @@ parser.add_argument("--model_dir", type=str, default="celeba_dcgan_model", help=
 parser.add_argument("--batch_size", type=int, default=100, help="batch size")
 parser.add_argument("--num_epochs", type=int, default=10, help="number of training epochs")
 parser.add_argument("--buffer_size", type=int, default=100000, help="buffer size to shuffle dataset")
+parser.add_argument('--data_format', type=str, choices=["channels_first", "channels_last"], default="channels_last", help="data_format")
 parser.add_argument('--train', action="store_true", help="with training")
 parser.add_argument('--eval', action="store_true", help="with evaluation")
 parser.add_argument('--predict', action="store_true", help="with prediction")
@@ -23,6 +25,10 @@ tf.logging.set_verbosity(tf.logging.INFO)
 
 
 class Dataset(dataset.Dataset):
+
+    def __init__(self, data_format):
+
+        self.data_format = data_format
 
     def parse(self, example):
 
@@ -47,38 +53,42 @@ class Dataset(dataset.Dataset):
         image = tf.image.convert_image_dtype(image, tf.float32)
         image = tf.image.resize_images(image, [256, 256])
 
+        if self.data_format == "channels_first":
+
+            image = tf.transpose(image, [2, 0, 1])
+
         return image
 
 
 wgan_gp_model = wgan_gp.Model(
-    Dataset=Dataset,
-    generator_param=wgan_gp.Model.GeneratorParam(
+    dataset=Dataset(args.data_format),
+    generator=resnet.Generator(
         image_size=[256, 256],
         filters=1024,
-        block_params=[
-            wgan_gp.Model.BlockParam(filters=1024, blocks=1),
-            wgan_gp.Model.BlockParam(filters=1024, blocks=1),
-            wgan_gp.Model.BlockParam(filters=512, blocks=1),
-            wgan_gp.Model.BlockParam(filters=256, blocks=1),
-            wgan_gp.Model.BlockParam(filters=128, blocks=1),
-            wgan_gp.Model.BlockParam(filters=64, blocks=1)
+        residual_params=[
+            resnet.Generator.ResidualParam(filters=1024, blocks=1),
+            resnet.Generator.ResidualParam(filters=1024, blocks=1),
+            resnet.Generator.ResidualParam(filters=512, blocks=1),
+            resnet.Generator.ResidualParam(filters=256, blocks=1),
+            resnet.Generator.ResidualParam(filters=128, blocks=1),
+            resnet.Generator.ResidualParam(filters=64, blocks=1)
         ],
-        data_format="channels_last",
+        data_format=args.data_format,
     ),
-    discriminator_param=wgan_gp.Model.DiscriminatorParam(
+    discriminator=resnet.Discriminator(
         filters=64,
-        block_params=[
-            wgan_gp.Model.BlockParam(filters=64, blocks=1),
-            wgan_gp.Model.BlockParam(filters=128, blocks=1),
-            wgan_gp.Model.BlockParam(filters=256, blocks=1),
-            wgan_gp.Model.BlockParam(filters=512, blocks=1),
-            wgan_gp.Model.BlockParam(filters=1024, blocks=1),
-            wgan_gp.Model.BlockParam(filters=1024, blocks=1)
-        ],
-        data_format="channels_last"
+        residual_params=[
+            resnet.Generator.ResidualParam(filters=64, blocks=1),
+            resnet.Generator.ResidualParam(filters=128, blocks=1),
+            resnet.Generator.ResidualParam(filters=256, blocks=1),
+            resnet.Generator.ResidualParam(filters=512, blocks=1),
+            resnet.Generator.ResidualParam(filters=1024, blocks=1),
+            resnet.Generator.ResidualParam(filters=1024, blocks=1)
+        ]
+        data_format=args.data_format
     ),
     hyper_param=wgan_gp.Model.HyperParam(
-        latent_dimensions=256,
+        latent_size=256,
         gradient_coefficient=10.0
     )
 )
@@ -87,12 +97,10 @@ if args.train:
 
     wgan_gp_model.train(
         model_dir=args.model_dir,
-        dataset_param=wgan_gp.Model.DatasetParam(
-            filenames=["data/train.tfrecord"],
-            batch_size=args.batch_size,
-            num_epochs=args.num_epochs,
-            buffer_size=args.buffer_size,
-        ),
+        filenames=["data/train.tfrecord"],
+        batch_size=args.batch_size,
+        num_epochs=args.num_epochs,
+        buffer_size=args.buffer_size,
         config=tf.ConfigProto(
             gpu_options=tf.GPUOptions(
                 visible_device_list=args.gpu,
@@ -107,12 +115,10 @@ if args.predict:
 
     wgan_gp_model.evaluate(
         model_dir=args.model_dir,
-        dataset_param=wgan_gp.Model.DatasetParam(
-            filenames=["data/test.tfrecord"],
-            batch_size=args.batch_size,
-            num_epochs=args.num_epochs,
-            buffer_size=args.buffer_size,
-        ),
+        filenames=["data/test.tfrecord"],
+        batch_size=args.batch_size,
+        num_epochs=args.num_epochs,
+        buffer_size=args.buffer_size,
         config=tf.ConfigProto(
             gpu_options=tf.GPUOptions(
                 visible_device_list=args.gpu,
@@ -127,12 +133,10 @@ if args.predict:
 
     wgan_gp_model.predict(
         model_dir=args.model_dir,
-        dataset_param=wgan_gp.Model.DatasetParam(
-            filenames=["data/test.tfrecord"],
-            batch_size=args.batch_size,
-            num_epochs=args.num_epochs,
-            buffer_size=args.buffer_size,
-        ),
+        filenames=["data/test.tfrecord"],
+        batch_size=args.batch_size,
+        num_epochs=args.num_epochs,
+        buffer_size=args.buffer_size,
         config=tf.ConfigProto(
             gpu_options=tf.GPUOptions(
                 visible_device_list=args.gpu,
