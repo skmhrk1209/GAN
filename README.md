@@ -54,14 +54,13 @@
 
 ### Loss Function
 
-Non-Saturating (NS) GAN
+* Non-Saturating (NS) GAN
 
 ### Regularization
 
-Gradient Penalty (WGAN-GP)
+* Gradient Penalty (WGAN-GP)
 
 ### Normalization
 
-Generator: Batch Normalization
-
-Discriminator: Spectral Normalization
+* Generator: Batch Normalization
+* Discriminator: Spectral Normalization
