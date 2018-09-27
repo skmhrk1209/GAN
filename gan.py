@@ -4,7 +4,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 import numpy as np
-import abc
 import collections
 import os
 import itertools
@@ -12,9 +11,9 @@ import time
 import cv2
 
 
-class Model(abc.ABC):
+class Model(object):
 
-    HyperParam = collections.namedtuple("HyperParam", ("latent_size"))
+    HyperParam = collections.namedtuple("HyperParam", ("latent_size", "gradient_coefficient"))
 
     def __init__(self, dataset, generator, discriminator, hyper_param):
 
@@ -26,6 +25,7 @@ class Model(abc.ABC):
         self.batch_size = tf.placeholder(dtype=tf.int32, shape=[])
         self.latent_size = tf.constant(value=hyper_param.latent_size, dtype=tf.int32)
         self.latents = tf.random_normal(shape=[self.batch_size, self.latent_size])
+        self.gradient_coefficient = tf.constant(value=hyper_param.gradient_coefficient, dtype=tf.float32)
 
         self.reals = self.dataset.input()
         self.fakes = self.generator(inputs=self.latents, training=self.training, reuse=False)
@@ -33,8 +33,26 @@ class Model(abc.ABC):
         self.real_logits = self.discriminator(inputs=self.reals, training=self.training, reuse=False)
         self.fake_logits = self.discriminator(inputs=self.fakes, training=self.training, reuse=True)
 
-        self.generator_loss = self.generator_loss()
-        self.discriminator_loss = self.discriminator_loss()
+        self.generator_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=self.fake_logits, labels=tf.ones_like(self.fake_logits)
+        ))
+
+        self.discriminator_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=self.real_logits, labels=tf.ones_like(self.real_logits)
+        ))
+        self.discriminator_loss += tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=self.fake_logits, labels=tf.zeros_like(self.fake_logits)
+        ))
+
+        interpolate_coefficients = tf.random_uniform(shape=[self.batch_size, 1, 1, 1], dtype=tf.float32)
+        interpolates = self.reals + (self.fakes - self.reals) * interpolate_coefficients
+        interpolate_logits = self.discriminator(inputs=interpolates, training=self.training, reuse=True)
+
+        gradients = tf.gradients(ys=interpolate_logits, xs=interpolates)[0]
+        slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), axis=[1, 2, 3]) + 0.0001)
+
+        self.gradient_penalty = tf.reduce_mean(tf.square(slopes - 1.0))
+        self.discriminator_loss += self.gradient_penalty * self.gradient_coefficient
 
         self.generator_eval_metric_op = tf.metrics.accuracy(
             labels=tf.ones_like(self.fake_logits),
@@ -70,14 +88,6 @@ class Model(abc.ABC):
                 var_list=self.discriminator_variables,
                 global_step=self.discriminator_global_step
             )
-
-    @abc.abstractmethod
-    def generator_loss(self):
-        pass
-
-    @abc.abstractmethod
-    def discriminator_loss(self):
-        pass
 
     def initialize(self, model_dir):
 

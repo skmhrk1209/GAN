@@ -3,10 +3,9 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-import abc
 
 
-class Dataset(abc.ABC):
+class Dataset(object):
 
     def __init__(self):
 
@@ -23,9 +22,9 @@ class Dataset(abc.ABC):
         self.dataset = self.dataset.prefetch(1)
         self.iterator = self.dataset.make_initializable_iterator()
 
-    @abc.abstractmethod
     def parse(self, example):
-        pass
+
+        raise NotImplementedError()
 
     def initialize(self, filenames, batch_size, num_epochs, buffer_size):
 

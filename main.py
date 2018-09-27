@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 import argparse
-import gan_gp
+import gan
 import resnet
 import dataset
 import utils
@@ -62,7 +62,7 @@ class Dataset(dataset.Dataset):
         return image
 
 
-gan_gp_model = gan_gp.Model(
+gan_model = gan.Model(
     dataset=Dataset(args.data_format),
     generator=resnet.Generator(
         image_size=[128, 128],
@@ -88,7 +88,7 @@ gan_gp_model = gan_gp.Model(
         ],
         data_format=args.data_format
     ),
-    hyper_param=gan_gp.Model.HyperParam(
+    hyper_param=gan.Model.HyperParam(
         latent_size=128,
         gradient_coefficient=10.0
     )
@@ -96,7 +96,7 @@ gan_gp_model = gan_gp.Model(
 
 if args.train:
 
-    gan_gp_model.train(
+    gan_model.train(
         model_dir=args.model_dir,
         filenames=["data/train.tfrecord"],
         batch_size=args.batch_size,
@@ -114,7 +114,7 @@ if args.train:
 
 if args.predict:
 
-    gan_gp_model.evaluate(
+    gan_model.evaluate(
         model_dir=args.model_dir,
         filenames=["data/test.tfrecord"],
         batch_size=args.batch_size,
@@ -132,7 +132,7 @@ if args.predict:
 
 if args.predict:
 
-    gan_gp_model.predict(
+    gan_model.predict(
         model_dir=args.model_dir,
         filenames=["data/test.tfrecord"],
         batch_size=args.batch_size,
