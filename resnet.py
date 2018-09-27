@@ -41,15 +41,12 @@ class Generator(object):
                 inputs = tf.transpose(inputs, [0, 3, 1, 2])
 
             for i, residual_param in enumerate(self.residual_params):
-                '''
+
                 inputs = ops.unpooling2d(
                     inputs=inputs,
                     pool_size=[2, 2],
                     data_format=self.data_format
                 )
-                '''
-
-                inputs = tf.keras.layers.UpSampling2D()(inputs)
 
                 for j in range(residual_param.blocks):
 
