@@ -28,9 +28,9 @@ class Dataset(dataset.Dataset):
 
     def __init__(self, data_format):
 
-        super().__init__()
-
         self.data_format = data_format
+
+        super().__init__()
 
     def parse(self, example):
 
