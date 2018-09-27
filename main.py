@@ -62,7 +62,7 @@ class Dataset(dataset.Dataset):
         return image
 
 
-wgan_gp_model = wgan_gp.Model(
+gan_gp_model = gan_gp.Model(
     dataset=Dataset(args.data_format),
     generator=resnet.Generator(
         image_size=[128, 128],
@@ -88,7 +88,7 @@ wgan_gp_model = wgan_gp.Model(
         ],
         data_format=args.data_format
     ),
-    hyper_param=wgan_gp.Model.HyperParam(
+    hyper_param=gan_gp.Model.HyperParam(
         latent_size=128,
         gradient_coefficient=10.0
     )
@@ -96,7 +96,7 @@ wgan_gp_model = wgan_gp.Model(
 
 if args.train:
 
-    wgan_gp_model.train(
+    gan_gp_model.train(
         model_dir=args.model_dir,
         filenames=["data/train.tfrecord"],
         batch_size=args.batch_size,
@@ -114,7 +114,7 @@ if args.train:
 
 if args.predict:
 
-    wgan_gp_model.evaluate(
+    gan_gp_model.evaluate(
         model_dir=args.model_dir,
         filenames=["data/test.tfrecord"],
         batch_size=args.batch_size,
@@ -132,7 +132,7 @@ if args.predict:
 
 if args.predict:
 
-    wgan_gp_model.predict(
+    gan_gp_model.predict(
         model_dir=args.model_dir,
         filenames=["data/test.tfrecord"],
         batch_size=args.batch_size,
