@@ -145,6 +145,4 @@ class Discriminator(object):
                 use_spectral_norm=True
             )
 
-            inputs = tf.nn.sigmoid(inputs)
-
             return inputs
