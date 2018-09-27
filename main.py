@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 import argparse
-import wgan_gp
+import gan_gp
 import resnet
 import dataset
 import utils
