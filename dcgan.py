@@ -172,63 +172,20 @@ class Model(object):
         )
 
         self.batch_size = tf.placeholder(dtype=tf.int32, shape=[])
-        self.latent_dimensions = tf.constant(value=hyper_param.latent_dimensions)
-        self.latents = tf.random_normal(shape=[self.batch_size, self.latent_dimensions])
+        self.latents = tf.random_normal(shape=[self.batch_size, hyper_param.latent_dimensions])
 
         self.training = tf.placeholder(dtype=tf.bool, shape=[])
         self.gradient_coefficient = tf.constant(value=hyper_param.gradient_coefficient, dtype=tf.float32)
 
         self.reals = self.dataset.input()
+        self.fakes = self.generator(inputs=self.latents, training=self.training, reuse=False)
 
-        self.fakes = self.generator(
-            inputs=self.latents,
-            training=self.training,
-            name="generator",
-            reuse=False
-        )
+        self.real_logits = self.discriminator(inputs=self.reals, training=self.training, reuse=False)
+        self.fake_logits = self.discriminator(inputs=self.fakes, training=self.training, reuse=True)
 
-        self.real_logits = self.discriminator(
-            inputs=self.reals,
-            training=self.training,
-            name="discriminator",
-            reuse=False
-        )
-
-        self.fake_logits = self.discriminator(
-            inputs=self.fakes,
-            training=self.training,
-            name="discriminator",
-            reuse=True
-        )
-
-        '''
-        self.generator_loss = tf.losses.sigmoid_cross_entropy(
-            multi_class_labels=tf.ones_like(self.fake_logits),
-            logits=self.fake_logits
-        )
-
-        self.discriminator_loss = tf.losses.sigmoid_cross_entropy(
-            multi_class_labels=tf.concat([tf.ones_like(self.real_logits), tf.zeros_like(self.fake_logits)], axis=0),
-            logits=tf.concat([self.real_logits, self.fake_logits], axis=0)
-        )
-        '''
-
-        self.generator_loss = -tf.reduce_mean(self.fake_logits)
-        self.discriminator_loss = -tf.reduce_mean(self.real_logits) + tf.reduce_mean(self.fake_logits)
-
-        self.interpolate_coefficients = tf.random_uniform(shape=[self.batch_size], dtype=tf.float32)
-        self.interpolates = self.reals + (self.fakes - self.reals) * tf.reshape(self.interpolate_coefficients, [-1, 1, 1, 1])
-        self.interpolate_logits = self.discriminator(
-            inputs=self.interpolates,
-            training=self.training,
-            name="discriminator",
-            reuse=True
-        )
-
-        self.gradients = tf.gradients(self.interpolate_logits, self.interpolates)[0]
-        self.slopes = tf.sqrt(tf.reduce_sum(tf.square(self.gradients), axis=[1, 2, 3]))
-        self.gradient_penalty = tf.reduce_mean(tf.square(self.slopes - tf.ones_like(self.slopes)))
-        self.discriminator_loss += self.gradient_penalty * self.gradient_coefficient
+        self.generator_loss = self.wgan_generator_loss()
+        self.discriminator_loss = self.wgan_discriminator_loss()
+        self.discriminator_loss += self.wgan_gradient_penalty() * self.gradient_coefficient
 
         self.generator_eval_metric_op = tf.metrics.accuracy(
             labels=tf.ones_like(self.fake_logits),
@@ -264,6 +221,26 @@ class Model(object):
                 var_list=self.discriminator_variables,
                 global_step=self.discriminator_global_step
             )
+
+    def wgan_generator_loss(self):
+
+        return -tf.reduce_mean(self.fake_logits)
+
+    def wgan_discriminator_loss(self):
+
+        return -tf.reduce_mean(self.real_logits) + tf.reduce_mean(self.fake_logits)
+
+    def wgan_gradient_penalty(self):
+
+        interpolate_coefficients = tf.random_uniform(shape=[self.batch_size, 1, 1, 1], dtype=tf.float32)
+        interpolates = self.reals + (self.fakes - self.reals) * interpolate_coefficients
+        interpolate_logits = self.discriminator(inputs=interpolates, training=self.training, reuse=True)
+
+        gradients = tf.gradients(interpolate_logits, interpolates)[0]
+        slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), axis=[1, 2, 3]) + 0.0001)
+        gradient_penalty = tf.reduce_mean(tf.square(slopes - 1.0))
+
+        return gradient_penalty
 
     def initialize(self, model_dir):
 
