@@ -9,12 +9,6 @@ import gan
 
 class Model(gan.Model):
 
-    """ implementation of WGAN-GP in TensorFlow
-
-    [1] [Improved Training of Wasserstein GANs] (https://arxiv.org/pdf/1511.06434.pdf) 
-        by Ishaan Gulrajani, Faruk Ahmed, Martin Arjovsky, Vincent Dumoulin, and Aaron Courville, Dec 2017.
-    """
-
     HyperParam = collections.namedtuple("HyperParam", ("latent_size", "gradient_coefficient"))
 
     def __init__(self, dataset, generator, discriminator, hyper_param):
