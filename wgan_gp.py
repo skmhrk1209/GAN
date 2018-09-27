@@ -19,9 +19,9 @@ class Model(gan.Model):
 
     def __init__(self, dataset, generator, discriminator, hyper_param):
 
-        super().__init__(dataset, generator, discriminator, hyper_param)
-
         self.gradient_coefficient = tf.constant(value=hyper_param.gradient_coefficient, dtype=tf.float32)
+
+        super().__init__(dataset, generator, discriminator, hyper_param)
 
     def generator_loss(self):
 
