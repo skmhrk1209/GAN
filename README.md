@@ -63,4 +63,5 @@ Gradient Penalty (WGAN-GP)
 ### Normalization
 
 Generator: Batch Normalization
+
 Discriminator: Spectral Normalization
