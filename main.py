@@ -6,6 +6,7 @@ import tensorflow as tf
 import argparse
 import gan
 import sndcgan
+import resnet
 import dataset
 
 parser = argparse.ArgumentParser()
@@ -61,39 +62,75 @@ class Dataset(dataset.Dataset):
         return image
 
 
-gan_model = gan.Model(
-    dataset=Dataset(args.data_format),
-    generator=sndcgan.Generator(
-        image_size=[128, 128],
-        filters=512,
-        deconv_params=[
-            sndcgan.Generator.DeconvParam(filters=256),
-            sndcgan.Generator.DeconvParam(filters=128),
-            sndcgan.Generator.DeconvParam(filters=64)
-        ],
-        data_format=args.data_format,
+gan_models = {
+    "SNDCGAN": gan.Model(
+        dataset=Dataset(args.data_format),
+        generator=sndcgan.Generator(
+            image_size=[128, 128],
+            filters=512,
+            deconv_params=[
+                sndcgan.Generator.DeconvParam(filters=256),
+                sndcgan.Generator.DeconvParam(filters=128),
+                sndcgan.Generator.DeconvParam(filters=64)
+            ],
+            data_format=args.data_format,
+        ),
+        discriminator=sndcgan.Discriminator(
+            filters=64,
+            conv_params=[
+                sndcgan.Discriminator.ConvParam(filters=128),
+                sndcgan.Discriminator.ConvParam(filters=256),
+                sndcgan.Discriminator.ConvParam(filters=512)
+            ],
+            data_format=args.data_format
+        ),
+        hyper_param=gan.Model.HyperParam(
+            latent_size=128,
+            gradient_coefficient=1.0,
+            learning_rate=0.0002,
+            beta1=0.5,
+            beta2=0.999
+        )
     ),
-    discriminator=sndcgan.Discriminator(
-        filters=64,
-        conv_params=[
-            sndcgan.Discriminator.ConvParam(filters=128),
-            sndcgan.Discriminator.ConvParam(filters=256),
-            sndcgan.Discriminator.ConvParam(filters=512)
-        ],
-        data_format=args.data_format
-    ),
-    hyper_param=gan.Model.HyperParam(
-        latent_size=128,
-        gradient_coefficient=1.0,
-        learning_rate=0.0002,
-        beta1=0.5,
-        beta2=0.999
+    "ResNet": gan.Model(
+        dataset=Dataset(args.data_format),
+        generator=resnet.Generator(
+            image_size=[128, 128],
+            filters=512,
+            residual_params=[
+                resnet.Generator.ResidualParam(filters=512, blocks=1),
+                resnet.Generator.ResidualParam(filters=256, blocks=1),
+                resnet.Generator.ResidualParam(filters=256, blocks=1),
+                resnet.Generator.ResidualParam(filters=128, blocks=1),
+                resnet.Generator.ResidualParam(filters=64, blocks=1)
+            ],
+            data_format=args.data_format,
+        ),
+        discriminator=resnet.Discriminator(
+            filters=64,
+            residual_params=[
+                resnet.Generator.ResidualParam(filters=64, blocks=1),
+                resnet.Generator.ResidualParam(filters=128, blocks=1),
+                resnet.Generator.ResidualParam(filters=256, blocks=1),
+                resnet.Generator.ResidualParam(filters=256, blocks=1),
+                resnet.Generator.ResidualParam(filters=512, blocks=1),
+                resnet.Generator.ResidualParam(filters=512, blocks=1)
+            ],
+            data_format=args.data_format
+        ),
+        hyper_param=gan.Model.HyperParam(
+            latent_size=128,
+            gradient_coefficient=1.0,
+            learning_rate=0.0002,
+            beta1=0.5,
+            beta2=0.999
+        )
     )
-)
+}
 
 if args.train:
 
-    gan_model.train(
+    gan_models["SNDCGAN"].train(
         model_dir=args.model_dir,
         filenames=["data/train.tfrecord"],
         batch_size=args.batch_size,
@@ -111,7 +148,7 @@ if args.train:
 
 if args.predict:
 
-    gan_model.predict(
+    gan_models["SNDCGAN"].predict(
         model_dir=args.model_dir,
         filenames=["data/test.tfrecord"],
         batch_size=args.batch_size,
