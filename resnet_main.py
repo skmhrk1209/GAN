@@ -9,7 +9,7 @@ import resnet
 import dataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_dir", type=str, default="celeba_gan_model", help="model directory")
+parser.add_argument("--model_dir", type=str, default="celeba_resnet_model", help="model directory")
 parser.add_argument("--batch_size", type=int, default=10, help="batch size")
 parser.add_argument("--num_epochs", type=int, default=10, help="number of training epochs")
 parser.add_argument("--buffer_size", type=int, default=100000, help="buffer size to shuffle dataset")
