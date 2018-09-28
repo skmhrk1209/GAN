@@ -7,7 +7,6 @@ import argparse
 import gan
 import resnet
 import dataset
-import utils
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, default="celeba_gan_model", help="model directory")
