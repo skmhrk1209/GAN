@@ -67,18 +67,18 @@ gan_model = gan.Model(
         image_size=[128, 128],
         filters=512,
         deconv_params=[
-            sndcgan.Generator.DeconvParam(filters=256, blocks=1),
-            sndcgan.Generator.DeconvParam(filters=128, blocks=1),
-            sndcgan.Generator.DeconvParam(filters=64, blocks=1)
+            sndcgan.Generator.DeconvParam(filters=256),
+            sndcgan.Generator.DeconvParam(filters=128),
+            sndcgan.Generator.DeconvParam(filters=64)
         ],
         data_format=args.data_format,
     ),
     discriminator=sndcgan.Discriminator(
         filters=64,
         conv_params=[
-            sndcgan.Discriminator.ConvParam(filters=128, blocks=1),
-            sndcgan.Discriminator.ConvParam(filters=256, blocks=1),
-            sndcgan.Discriminator.ConvParam(filters=512, blocks=1)
+            sndcgan.Discriminator.ConvParam(filters=128),
+            sndcgan.Discriminator.ConvParam(filters=256),
+            sndcgan.Discriminator.ConvParam(filters=512)
         ],
         data_format=args.data_format
     ),
