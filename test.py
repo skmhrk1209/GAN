@@ -94,7 +94,7 @@ if args.train:
 
     gan_model.train(
         model_dir=args.model_dir,
-        filenames=["train.tfrecord"],
+        filenames=["mnist/train.tfrecord"],
         batch_size=args.batch_size,
         num_epochs=args.num_epochs,
         buffer_size=args.buffer_size,
@@ -112,7 +112,7 @@ if args.predict:
 
     gan_model.predict(
         model_dir=args.model_dir,
-        filenames=["test.tfrecord"],
+        filenames=["mnist/test.tfrecord"],
         batch_size=args.batch_size,
         num_epochs=args.num_epochs,
         buffer_size=args.buffer_size,
