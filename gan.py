@@ -185,15 +185,20 @@ class Model(object):
 
                         start = time.time()
 
-                        fakes = session.run(self.fakes, feed_dict=feed_dict)
+                        if i % 1000 == 0:
 
-                        images = np.concatenate([reals, fakes], axis=2)
+                            fakes = session.run(self.fakes, feed_dict=feed_dict)
 
-                        for image in images:
+                            images = np.concatenate([reals, fakes], axis=2)
 
-                            cv2.imshow("image", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+                            images = utils.scale(images, 0, 1, 0, 255)
 
-                            cv2.waitKey(100)
+                            for j, image in enumerate(images):
+
+                                cv2.imwrite(
+                                    "generated/image_{}_{}.png".format(i, j),
+                                    cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                                )
 
             except tf.errors.OutOfRangeError:
 
