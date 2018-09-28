@@ -203,13 +203,11 @@ class Model(object):
 
         with tf.Session(config=config) as session:
 
-            saver = self.initialize(model_dir)
+            self.initialize(model_dir)
 
             try:
 
                 print("prediction started")
-
-                start = time.time()
 
                 self.dataset.initialize(
                     filenames=filenames,
