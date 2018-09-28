@@ -117,24 +117,6 @@ if args.train:
 
 if args.predict:
 
-    gan_model.evaluate(
-        model_dir=args.model_dir,
-        filenames=["data/test.tfrecord"],
-        batch_size=args.batch_size,
-        num_epochs=args.num_epochs,
-        buffer_size=args.buffer_size,
-        config=tf.ConfigProto(
-            gpu_options=tf.GPUOptions(
-                visible_device_list=args.gpu,
-                allow_growth=True
-            ),
-            log_device_placement=False,
-            allow_soft_placement=True
-        )
-    )
-
-if args.predict:
-
     gan_model.predict(
         model_dir=args.model_dir,
         filenames=["data/test.tfrecord"],
