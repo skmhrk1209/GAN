@@ -9,6 +9,7 @@ import os
 import itertools
 import time
 import cv2
+import utils
 
 
 class Model(object):
