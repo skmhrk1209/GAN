@@ -6,7 +6,7 @@ import tensorflow as tf
 import argparse
 from models import gan
 from archs import dcgan
-from data import dataset
+from data import celeba
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, default="celeba_dcgan_model", help="model directory")
@@ -24,48 +24,8 @@ args = parser.parse_args()
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
-class Dataset(dataset.Dataset):
-
-    def __init__(self, image_size, data_format):
-
-        self.image_size = image_size
-        self.data_format = data_format
-
-        super(Dataset, self).__init__()
-
-    def parse(self, example):
-
-        features = tf.parse_single_example(
-            serialized=example,
-            features={
-                "path": tf.FixedLenFeature(
-                    shape=[],
-                    dtype=tf.string,
-                    default_value=""
-                ),
-                "label": tf.FixedLenFeature(
-                    shape=[],
-                    dtype=tf.int64,
-                    default_value=0
-                )
-            }
-        )
-
-        image = tf.read_file(features["path"])
-        image = tf.image.decode_jpeg(image, 3)
-        image = tf.image.convert_image_dtype(image, tf.float32)
-        image = tf.image.resize_image_with_crop_or_pad(image, 128, 128)
-        image = tf.image.resize_images(image, self.image_size)
-
-        if self.data_format == "channels_first":
-
-            image = tf.transpose(image, [2, 0, 1])
-
-        return image
-
-
 gan_model = gan.Model(
-    dataset=Dataset(
+    dataset=celeba.Dataset(
         image_size=[128, 128],
         data_format=args.data_format
     ),
