@@ -4,15 +4,15 @@ from __future__ import print_function
 
 import tensorflow as tf
 import argparse
-import gan
-import sndcgan
-import resnet
-import dataset
+from models import gan
+from archs import dcgan
+from data import dataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_dir", type=str, default="celeba_sndcgan_model", help="model directory")
-parser.add_argument("--batch_size", type=int, default=10, help="batch size")
+parser.add_argument("--model_dir", type=str, default="celeba_dcgan_model", help="model directory")
+parser.add_argument('--filenames', type=str, nargs="+", default=["data/train.tfrecord"], help="data_format")
 parser.add_argument("--num_epochs", type=int, default=10, help="number of training epochs")
+parser.add_argument("--batch_size", type=int, default=10, help="batch size")
 parser.add_argument("--buffer_size", type=int, default=100000, help="buffer size to shuffle dataset")
 parser.add_argument('--data_format', type=str, choices=["channels_first", "channels_last"], default="channels_last", help="data_format")
 parser.add_argument('--train', action="store_true", help="with training")
@@ -26,8 +26,9 @@ tf.logging.set_verbosity(tf.logging.INFO)
 
 class Dataset(dataset.Dataset):
 
-    def __init__(self, data_format):
+    def __init__(self, image_size, data_format):
 
+        self.image_size = image_size
         self.data_format = data_format
 
         super(Dataset, self).__init__()
@@ -54,6 +55,7 @@ class Dataset(dataset.Dataset):
         image = tf.image.decode_jpeg(image, 3)
         image = tf.image.convert_image_dtype(image, tf.float32)
         image = tf.image.resize_image_with_crop_or_pad(image, 128, 128)
+        image = tf.image.resize_images(image, self.image_size)
 
         if self.data_format == "channels_first":
 
@@ -62,104 +64,58 @@ class Dataset(dataset.Dataset):
         return image
 
 
-gan_models = {
-    "SNDCGAN": gan.Model(
-        dataset=Dataset(args.data_format),
-        generator=sndcgan.Generator(
-            image_size=[128, 128],
-            filters=512,
-            deconv_params=[
-                sndcgan.Generator.DeconvParam(filters=256),
-                sndcgan.Generator.DeconvParam(filters=128),
-                sndcgan.Generator.DeconvParam(filters=64)
-            ],
-            data_format=args.data_format,
-        ),
-        discriminator=sndcgan.Discriminator(
-            filters=64,
-            conv_params=[
-                sndcgan.Discriminator.ConvParam(filters=128),
-                sndcgan.Discriminator.ConvParam(filters=256),
-                sndcgan.Discriminator.ConvParam(filters=512)
-            ],
-            data_format=args.data_format
-        ),
-        hyper_param=gan.Model.HyperParam(
-            latent_size=128,
-            gradient_coefficient=1.0,
-            learning_rate=0.0002,
-            beta1=0.5,
-            beta2=0.999
-        )
+gan_model = gan.Model(
+    dataset=Dataset(
+        image_size=[128, 128],
+        data_format=args.data_format
     ),
-    "ResNet": gan.Model(
-        dataset=Dataset(args.data_format),
-        generator=resnet.Generator(
-            image_size=[128, 128],
-            filters=512,
-            residual_params=[
-                resnet.Generator.ResidualParam(filters=512, blocks=1),
-                resnet.Generator.ResidualParam(filters=256, blocks=1),
-                resnet.Generator.ResidualParam(filters=256, blocks=1),
-                resnet.Generator.ResidualParam(filters=128, blocks=1),
-                resnet.Generator.ResidualParam(filters=64, blocks=1)
-            ],
-            data_format=args.data_format,
-        ),
-        discriminator=resnet.Discriminator(
-            filters=64,
-            residual_params=[
-                resnet.Generator.ResidualParam(filters=64, blocks=1),
-                resnet.Generator.ResidualParam(filters=128, blocks=1),
-                resnet.Generator.ResidualParam(filters=256, blocks=1),
-                resnet.Generator.ResidualParam(filters=256, blocks=1),
-                resnet.Generator.ResidualParam(filters=512, blocks=1),
-                resnet.Generator.ResidualParam(filters=512, blocks=1)
-            ],
-            data_format=args.data_format
-        ),
-        hyper_param=gan.Model.HyperParam(
-            latent_size=128,
-            gradient_coefficient=1.0,
-            learning_rate=0.0002,
-            beta1=0.5,
-            beta2=0.999
+    generator=dcgan.Generator(
+        image_size=[128, 128],
+        filters=512,
+        deconv_params=[
+            dcgan.Generator.DeconvParam(filters=256),
+            dcgan.Generator.DeconvParam(filters=128),
+            dcgan.Generator.DeconvParam(filters=64)
+        ],
+        data_format=args.data_format,
+    ),
+    discriminator=dcgan.Discriminator(
+        filters=64,
+        conv_params=[
+            dcgan.Discriminator.ConvParam(filters=128),
+            dcgan.Discriminator.ConvParam(filters=256),
+            dcgan.Discriminator.ConvParam(filters=512)
+        ],
+        data_format=args.data_format
+    ),
+    hyper_param=gan.Model.HyperParam(
+        latent_size=128,
+        gradient_coefficient=1.0,
+        learning_rate=0.0002,
+        beta1=0.5,
+        beta2=0.999
+    ),
+    name=args.model_dir
+)
+
+config = tf.ConfigProto(
+    gpu_options=tf.GPUOptions(
+        visible_device_list=args.gpu,
+        allow_growth=True
+    ),
+    log_device_placement=False,
+    allow_soft_placement=True
+)
+
+with tf.Session(config=config) as session:
+
+    if args.train:
+
+        gan_model.initialize()
+
+        gan_model.train(
+            filenames=args.filenames,
+            num_epochs=args.num_epochs,
+            batch_size=args.batch_size,
+            buffer_size=args.buffer_size
         )
-    )
-}
-
-if args.train:
-
-    gan_models["SNDCGAN"].train(
-        model_dir=args.model_dir,
-        filenames=["data/train.tfrecord"],
-        batch_size=args.batch_size,
-        num_epochs=args.num_epochs,
-        buffer_size=args.buffer_size,
-        config=tf.ConfigProto(
-            gpu_options=tf.GPUOptions(
-                visible_device_list=args.gpu,
-                allow_growth=True
-            ),
-            log_device_placement=False,
-            allow_soft_placement=True
-        )
-    )
-
-if args.predict:
-
-    gan_models["SNDCGAN"].predict(
-        model_dir=args.model_dir,
-        filenames=["data/test.tfrecord"],
-        batch_size=args.batch_size,
-        num_epochs=args.num_epochs,
-        buffer_size=args.buffer_size,
-        config=tf.ConfigProto(
-            gpu_options=tf.GPUOptions(
-                visible_device_list=args.gpu,
-                allow_growth=True
-            ),
-            log_device_placement=False,
-            allow_soft_placement=True
-        )
-    )

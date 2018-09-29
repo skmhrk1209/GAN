@@ -5,7 +5,7 @@ from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 import collections
-import ops
+from . import ops
 
 
 class Generator(object):
@@ -19,7 +19,7 @@ class Generator(object):
         self.deconv_params = deconv_params
         self.data_format = data_format
 
-    def __call__(self, inputs, training, name="generator", reuse=False):
+    def __call__(self, inputs, training, name="generator", reuse=None):
 
         with tf.variable_scope(name, reuse=reuse):
 
@@ -34,7 +34,8 @@ class Generator(object):
             inputs = ops.batch_normalization(
                 inputs=inputs,
                 data_format=self.data_format,
-                training=training
+                training=training,
+                name="batch_normalization_0"
             )
 
             inputs = tf.nn.relu(inputs)
@@ -48,7 +49,7 @@ class Generator(object):
 
                 inputs = tf.transpose(inputs, [0, 3, 1, 2])
 
-            for i, deconv_param in enumerate(self.deconv_params):
+            for i, deconv_param in enumerate(self.deconv_params, 1):
 
                 inputs = ops.deconv2d(
                     inputs=inputs,
@@ -56,13 +57,14 @@ class Generator(object):
                     kernel_size=[4, 4],
                     strides=[2, 2],
                     data_format=self.data_format,
-                    name="deconv_{}".format(i)
+                    name="deconv2d_{}".format(i)
                 )
 
                 inputs = ops.batch_normalization(
                     inputs=inputs,
                     data_format=self.data_format,
-                    training=training
+                    training=training,
+                    name="batch_normalization_{}".format(i)
                 )
 
                 inputs = tf.nn.relu(inputs)
@@ -73,7 +75,7 @@ class Generator(object):
                 kernel_size=[3, 3],
                 strides=[1, 1],
                 data_format=self.data_format,
-                name="conv2d_{}".format(len(self.deconv_params))
+                name="last_deconv2d_{}".format(len(self.deconv_params) + 1)
             )
 
             inputs = tf.nn.sigmoid(inputs)
@@ -91,7 +93,7 @@ class Discriminator(object):
         self.conv_params = conv_params
         self.data_format = data_format
 
-    def __call__(self, inputs, training, name="discriminator", reuse=False):
+    def __call__(self, inputs, training, name="discriminator", reuse=None):
 
         with tf.variable_scope(name, reuse=reuse):
 
@@ -101,13 +103,13 @@ class Discriminator(object):
                 kernel_size=[3, 3],
                 strides=[1, 1],
                 data_format=self.data_format,
-                name="conv2d_0",
+                name="first_conv2d_{}".format(len(self.conv_params) + 1),
                 apply_spectral_normalization=True
             )
 
             inputs = tf.nn.leaky_relu(inputs)
 
-            for i, conv_param in enumerate(self.conv_params):
+            for i, conv_param in enumerate(self.conv_params, 1):
 
                 inputs = ops.conv2d(
                     inputs=inputs,
@@ -115,7 +117,7 @@ class Discriminator(object):
                     kernel_size=[4, 4],
                     strides=[2, 2],
                     data_format=self.data_format,
-                    name="conv2d_{}_0".format(i),
+                    name="conv2d_{}_1".format(len(self.conv_params) + 1 - i),
                     apply_spectral_normalization=True
                 )
 
@@ -127,7 +129,7 @@ class Discriminator(object):
                     kernel_size=[3, 3],
                     strides=[1, 1],
                     data_format=self.data_format,
-                    name="conv2d_{}_1".format(i),
+                    name="conv2d_{}_0".format(len(self.conv_params) + 1 - i),
                     apply_spectral_normalization=True
                 )
 
