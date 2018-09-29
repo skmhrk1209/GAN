@@ -1,7 +1,4 @@
 *.pyc
+__pycache__/
 .DS_Store
 .vscode/
-__pycache__/
-data/
-celeba_gan_gp_model/
-celeba_gan_gp_model.tar.gz
