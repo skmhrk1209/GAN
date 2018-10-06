@@ -110,7 +110,7 @@ with tf.Session(config=config) as session:
     for gan_model in gan_models[:1]:
 
         gan_model.initialize()
-        '''
+        
         if args.train:
 
             gan_model.train(
@@ -125,7 +125,7 @@ with tf.Session(config=config) as session:
             gan_model.generate(
                 batch_size=args.batch_size
             )
-        '''
+        
     for gan_model in gan_models[1:]:
 
         gan_model.reinitialize()
