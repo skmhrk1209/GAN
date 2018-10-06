@@ -1,29 +1,25 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow as tf
 import numpy as np
-import collections
 import os
 import itertools
 import time
 import cv2
 
 
+def lerp(a, b, t):
+    return a + (b - a) * t
+
+
 class Model(object):
 
-    HyperParam = collections.namedtuple(
-        "HyperParam", (
-            "latent_size",
-            "gradient_coefficient",
-            "learning_rate",
-            "beta1",
-            "beta2"
-        )
-    )
+    class LossFunction:
+        NS_GAN, WGAN = range(2)
 
-    def __init__(self, dataset, generator, discriminator, hyper_param, name="gan", reuse=None):
+    class GradientPenalty:
+        ZERO_CENTERED, ONE_CENTERED = range(2)
+
+    def __init__(self, dataset, generator, discriminator, loss_function,
+                 gradient_penalty, hyper_parameters, name="gan", reuse=None):
 
         # if train this model in PGGAN style
         # set reuse=tf.AUTO_REUSE
@@ -33,7 +29,7 @@ class Model(object):
             self.dataset = dataset
             self.generator = generator
             self.discriminator = discriminator
-            self.hyper_param = hyper_param
+            self.hyper_parameters = hyper_parameters
 
             self.batch_size = tf.placeholder(
                 dtype=tf.int32,
@@ -46,27 +42,17 @@ class Model(object):
                 name="training"
             )
 
-            ### [CAUTION] ###
-            # if assign get_next() to input data tensor,
-            # running any operation that depends on input data tensor
-            # advances input data iterator!
-            # so, use placeholder for reals
             self.next_reals = self.dataset.get_next()
-
-            self.next_latents = tf.random_normal(
-                shape=[self.batch_size, self.hyper_param.latent_size],
-                dtype=tf.float32
-            )
+            self.next_latents = tf.random_normal(shape=[self.batch_size, self.hyper_parameters.latent_size])
 
             self.reals = tf.placeholder(
                 dtype=tf.float32,
                 shape=self.next_reals.shape,
                 name="reals"
             )
-
             self.latents = tf.placeholder(
                 dtype=tf.float32,
-                shape=[None, self.hyper_param.latent_size],
+                shape=[None, self.hyper_parameters.latent_size],
                 name="latents"
             )
 
@@ -88,40 +74,77 @@ class Model(object):
                 reuse=True
             )
 
-            # minimize JS Divergence(GAN)
-            # instead of Wasserstein Distance(WGAN)
-            self.generator_loss = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=self.fake_logits,
-                    labels=tf.ones_like(self.fake_logits)
-                )
-            )
+            #========================================================================#
+            # two types of loss function
+            # 1. NS-GAN loss function (https://arxiv.org/pdf/1406.2661.pdf)
+            # 2. WGAN loss function (https://arxiv.org/pdf/1701.07875.pdf)
+            #========================================================================#
+            if loss_function == Model.LossFunction.NS_GAN:
 
-            self.discriminator_loss = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=self.real_logits,
-                    labels=tf.ones_like(self.real_logits)
+                self.generator_loss = tf.reduce_mean(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        logits=self.fake_logits,
+                        labels=tf.ones_like(self.fake_logits)
+                    )
                 )
-            )
-            self.discriminator_loss += tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    logits=self.fake_logits,
-                    labels=tf.zeros_like(self.fake_logits)
+
+                self.discriminator_loss = tf.reduce_mean(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        logits=self.real_logits,
+                        labels=tf.ones_like(self.real_logits)
+                    )
                 )
+                self.discriminator_loss += tf.reduce_mean(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        logits=self.fake_logits,
+                        labels=tf.zeros_like(self.fake_logits)
+                    )
+                )
+
+            elif loss_function == Model.LossFunction.WGAN:
+
+                self.generator_loss = -tf.reduce_mean(self.fake_logits)
+
+                self.discriminator_loss = -tf.reduce_mean(self.real_logits)
+                self.discriminator_loss += tf.reduce_mean(self.fake_logits)
+
+            else:
+                raise ValueError("Invalid loss function")
+
+            #========================================================================#
+            # linear interpolation for gradient penalty
+            #========================================================================#
+            self.lerp_coefficients = tf.random_uniform(shape=[self.batch_size, 1, 1, 1])
+            self.lerped = lerp(self.reals, self.fakes, self.lerp_coefficients)
+            self.lerped_logits = discriminator(
+                inputs=self.lerped,
+                training=self.training,
+                name="discriminator",
+                reuse=True
             )
-
-            # add WGAN-GP gradient penalty to discriminator loss
-            # slopes throws NaN (https://github.com/tdeboissiere/DeepLearningImplementations/issues/68)
-            # so add epsilon inside sqrt()
-            self.interpolate_coefficients = tf.random_uniform(shape=[self.batch_size, 1, 1, 1], dtype=tf.float32)
-            self.interpolates = self.reals + (self.fakes - self.reals) * self.interpolate_coefficients
-            self.interpolate_logits = discriminator(inputs=self.interpolates, training=self.training, name="discriminator", reuse=True)
-
-            self.gradients = tf.gradients(ys=self.interpolate_logits, xs=self.interpolates)[0]
+            #========================================================================#
+            # two types of gradient penalty
+            # 1. zero-centered gradient penalty (https://openreview.net/pdf?id=ByxPYjC5KQ)
+            # -> NOT EFFECTIVE FOR NOW
+            # 2. one-centered gradient penalty (https://arxiv.org/pdf/1704.00028.pdf)
+            # to avoid NaN exception, add epsilon inside sqrt()
+            # (https://github.com/tdeboissiere/DeepLearningImplementations/issues/68)
+            #========================================================================#
+            self.gradients = tf.gradients(ys=self.lerped_logits, xs=self.lerped)[0]
             self.slopes = tf.sqrt(tf.reduce_sum(tf.square(self.gradients), axis=[1, 2, 3]) + 0.0001)
 
-            self.gradient_penalty = tf.reduce_mean(tf.square(self.slopes - 1.0))
-            self.discriminator_loss += self.gradient_penalty * self.hyper_param.gradient_coefficient
+            if gradient_penalty == Model.GradientPenalty.ZERO_CENTERED:
+
+                self.gradient_penalty = tf.reduce_mean(tf.square(self.slopes - 0.0))
+
+            elif gradient_penalty == Model.GradientPenalty.ONE_CENTERED:
+
+                self.gradient_penalty = tf.reduce_mean(tf.square(self.slopes - 1.0))
+
+            else:
+                raise ValueError("Invalid gradient penalty")
+
+            self.discriminator_loss += self.gradient_penalty * self.hyper_parameters.gradient_coefficient
 
             self.generator_variables = tf.get_collection(
                 key=tf.GraphKeys.TRAINABLE_VARIABLES,
@@ -132,7 +155,6 @@ class Model(object):
                 scope="{}/discriminator".format(self.name)
             )
 
-            # it's ok generator global step and discriminator global step isn't same
             self.generator_global_step = tf.get_variable(
                 name="generator_global_step",
                 shape=[],
@@ -148,21 +170,23 @@ class Model(object):
                 trainable=False
             )
 
-            # tune hyper parameter learning rate, beta1, beta2
             self.generator_optimizer = tf.train.AdamOptimizer(
-                learning_rate=self.hyper_param.learning_rate,
-                beta1=self.hyper_param.beta1,
-                beta2=self.hyper_param.beta2
+                learning_rate=self.hyper_parameters.learning_rate,
+                beta1=self.hyper_parameters.beta1,
+                beta2=self.hyper_parameters.beta2
             )
             self.discriminator_optimizer = tf.train.AdamOptimizer(
-                learning_rate=self.hyper_param.learning_rate,
-                beta1=self.hyper_param.beta1,
-                beta2=self.hyper_param.beta2
+                learning_rate=self.hyper_parameters.learning_rate,
+                beta1=self.hyper_parameters.beta1,
+                beta2=self.hyper_parameters.beta2
             )
 
-            # to update moving_mean and moving_variance for batch normalization when trainig,
-            # run update operation before run train operation
-            # this update operation is placed in tf.GraphKeys.UPDATE_OPS
+            #========================================================================#
+            # to update moving_mean and moving_variance
+            # for batch normalization when trainig,
+            # run update operation before train operation
+            # update operation is placed in tf.GraphKeys.UPDATE_OPS
+            #========================================================================#
             with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
 
                 self.generator_train_op = self.generator_optimizer.minimize(
@@ -177,13 +201,11 @@ class Model(object):
                     global_step=self.discriminator_global_step
                 )
 
-            # save variables already defined
             self.saver = tf.train.Saver()
 
-            # setup summaries of important tensor
             self.summary = tf.summary.merge([
-                tf.summary.image("reals", self.reals),
-                tf.summary.image("fakes", self.fakes),
+                tf.summary.image("reals", self.reals, max_outputs=10),
+                tf.summary.image("fakes", self.fakes, max_outputs=10),
                 tf.summary.scalar("generator_loss", self.generator_loss),
                 tf.summary.scalar("discriminator_loss", self.discriminator_loss),
                 tf.summary.scalar("gradient_penalty", self.gradient_penalty),
@@ -229,13 +251,17 @@ class Model(object):
 
         start = time.time()
 
-        # initialize dataset iterator
         self.dataset.initialize(
             filenames=filenames,
             num_epochs=num_epochs,
             batch_size=batch_size,
             buffer_size=buffer_size
         )
+
+        feed_dict = {
+            self.batch_size: batch_size,
+            self.training: True
+        }
 
         ### [CAUTION] ###
         # variables in pre-trained model depends placeholders that doesn't exist in this instance.
@@ -264,8 +290,6 @@ class Model(object):
 
         for i in itertools.count():
 
-            feed_dict = {self.batch_size: batch_size}
-
             try:
                 reals, latents = session.run(
                     [self.next_reals, self.next_latents],
@@ -280,7 +304,10 @@ class Model(object):
                 if reals.shape[0] != batch_size:
                     break
 
-            feed_dict.update({self.reals: reals})
+            feed_dict.update({
+                self.reals: reals,
+                self.latents: latents
+            })
 
             feed_dict.update({
                 latents_placeholder: latents
@@ -320,16 +347,7 @@ class Model(object):
                 summary = session.run(self.summary, feed_dict=feed_dict)
                 writer.add_summary(summary, global_step=generator_global_step)
 
-                fakes = session.run(self.fakes, feed_dict=feed_dict)
-                images = np.concatenate([reals, fakes], axis=2)
-                images = [cv2.cvtColor(image, cv2.COLOR_RGB2BGR) for image in images]
-
-                for j, image in enumerate(images):
-
-                    cv2.imshow("image", image)
-                    cv2.waitKey(100)
-
-                if i % 1000 == 0:
+                if i % 100000 == 0:
 
                     checkpoint = self.saver.save(
                         sess=session,
@@ -340,3 +358,15 @@ class Model(object):
                     stop = time.time()
                     print("{} saved ({:.2f} sec)".format(checkpoint, stop - start))
                     start = time.time()
+
+    def generate(self, batch_size):
+
+        session = tf.get_default_session()
+
+        latents = session.run(self.next_latents, feed_dict={self.batch_size: batch_size})
+        fakes = session.run(self.fakes, feed_dict={self.latents: latents, self.training: False})
+
+        for i, fake in enumerate(fakes):
+
+            fake = cv2.cvtColor(fake, cv2.COLOR_RGB2BGR)
+            cv2.imwrite("generated/fake_{}.png".format(i), fake * 255.0)
