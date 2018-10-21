@@ -300,10 +300,6 @@ class Model(object):
                 print("training ended")
                 break
 
-            else:
-                if reals.shape[0] != batch_size:
-                    break
-
             feed_dict.update({
                 self.reals: reals,
                 self.latents: latents
@@ -324,21 +320,21 @@ class Model(object):
                 feed_dict=feed_dict
             )
 
-            if i % 100 == 0:
+            generator_global_step, discriminator_global_step = session.run(
+                [self.generator_global_step, self.discriminator_global_step]
+            )
 
-                generator_global_step, generator_loss = session.run(
-                    [self.generator_global_step, self.generator_loss],
+            if generator_global_step % 100 == 0:
+
+                generator_loss, discriminator_loss = session.run(
+                    [self.generator_loss, self.discriminator_loss],
                     feed_dict=feed_dict
                 )
+
                 print("global_step: {}, generator_loss: {:.2f}".format(
                     generator_global_step,
                     generator_loss
                 ))
-
-                discriminator_global_step, discriminator_loss = session.run(
-                    [self.discriminator_global_step, self.discriminator_loss],
-                    feed_dict=feed_dict
-                )
                 print("global_step: {}, discriminator_loss: {:.2f}".format(
                     discriminator_global_step,
                     discriminator_loss
@@ -347,7 +343,7 @@ class Model(object):
                 summary = session.run(self.summary, feed_dict=feed_dict)
                 writer.add_summary(summary, global_step=generator_global_step)
 
-                if i % 100000 == 0:
+                if generator_global_step % 100000 == 0:
 
                     checkpoint = self.saver.save(
                         sess=session,
@@ -355,18 +351,13 @@ class Model(object):
                         global_step=generator_global_step
                     )
 
+                    tf.train.write_graph(
+                        graph_or_graph_def=session.graph.as_graph_def(),
+                        logdir=self.name,
+                        name="graph.pb",
+                        as_text=False
+                    )
+
                     stop = time.time()
                     print("{} saved ({:.2f} sec)".format(checkpoint, stop - start))
                     start = time.time()
-
-    def generate(self, batch_size):
-
-        session = tf.get_default_session()
-
-        latents = session.run(self.next_latents, feed_dict={self.batch_size: batch_size})
-        fakes = session.run(self.fakes, feed_dict={self.latents: latents, self.training: False})
-
-        for i, fake in enumerate(fakes):
-
-            fake = cv2.cvtColor(fake, cv2.COLOR_RGB2BGR)
-            cv2.imwrite("generated/fake_{}.png".format(i), fake * 255.0)
