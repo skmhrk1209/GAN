@@ -54,7 +54,7 @@ gan_models = [
         ),
         loss_function=gan.Model.LossFunction.NS_GAN,
         gradient_penalty=gan.Model.GradientPenalty.ONE_CENTERED,
-        hyper_parameters=attr_dict.AttrDict(
+        hyper_params=attr_dict.AttrDict(
             latent_size=128,
             gradient_coefficient=1.0,
             learning_rate=0.0002,
@@ -84,7 +84,7 @@ gan_models = [
         ),
         loss_function=gan.Model.LossFunction.NS_GAN,
         gradient_penalty=gan.Model.GradientPenalty.ONE_CENTERED,
-        hyper_parameters=attr_dict.AttrDict(
+        hyper_params=attr_dict.AttrDict(
             latent_size=128,
             gradient_coefficient=1.0,
             learning_rate=0.0002,
